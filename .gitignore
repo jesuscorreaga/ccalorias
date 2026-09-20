@@ -46,3 +46,7 @@ venv/
 __pycache__/
 *.pyc
 .env
+ccalorias-backend/venv/
+ccalorias-backend/__pycache__/
+ccalorias-backend/.env
+node_modules/
