@@ -1,12 +1,71 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { useRef, useState } from "react";
-import { Button, Image, StyleSheet } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Button,
+  Image,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { LoginForm } from "@/components/login-form";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { BottomTabInset } from "@/constants/theme";
+import { type AnalisisFoto, analizarFoto, obtenerToken } from "@/lib/api";
+
 export default function HomeScreen() {
+  const [autenticado, setAutenticado] = useState<boolean | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [analisis, setAnalisis] = useState<AnalisisFoto | null>(null);
+  const [cargando, setCargando] = useState(false);
   const cameraRef = useRef<CameraView>(null);
+
+  useEffect(() => {
+    obtenerToken().then((token) => setAutenticado(!!token));
+  }, []);
+
+  function reiniciar() {
+    setPhotoUri(null);
+    setAnalisis(null);
+  }
+
+  async function takePicture() {
+    if (!cameraRef.current || cargando) return;
+    const photo = await cameraRef.current.takePictureAsync({ quality: 0.6 });
+    if (!photo) return;
+
+    setPhotoUri(photo.uri);
+    setCargando(true);
+    try {
+      setAnalisis(await analizarFoto(photo.uri));
+    } catch (e) {
+      reiniciar();
+      if (e instanceof Error && e.message === "SESION_EXPIRADA") {
+        setAutenticado(false);
+      } else {
+        Alert.alert("Error", e instanceof Error ? e.message : "Algo salió mal");
+      }
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  if (autenticado === null) {
+    return (
+      <SafeAreaView style={styles.centrado}>
+        <ActivityIndicator size="large" />
+      </SafeAreaView>
+    );
+  }
+
+  if (!autenticado) {
+    return <LoginForm onSuccess={() => setAutenticado(true)} />;
+  }
 
   if (!permission) {
     return <SafeAreaView style={styles.container} />;
@@ -14,25 +73,52 @@ export default function HomeScreen() {
 
   if (!permission.granted) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.centrado}>
         <Button title="Dar permiso de cámara" onPress={requestPermission} />
       </SafeAreaView>
     );
   }
 
-  async function takePicture() {
-    if (cameraRef.current) {
-      const photo = await cameraRef.current.takePictureAsync();
-      setPhotoUri(photo?.uri ?? null);
-    }
-  }
-
   if (photoUri) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Image source={{ uri: photoUri }} style={styles.preview} />
-        <Button title="Tomar otra foto" onPress={() => setPhotoUri(null)} />
-      </SafeAreaView>
+      <ThemedView style={styles.container}>
+        <SafeAreaView style={styles.container}>
+          <Image
+            source={{ uri: photoUri }}
+            style={styles.preview}
+            resizeMode="cover"
+          />
+
+          {cargando ? (
+            <View style={styles.centrado}>
+              <ActivityIndicator size="large" />
+              <ThemedText>Analizando tu plato...</ThemedText>
+            </View>
+          ) : analisis ? (
+            <ScrollView
+              style={styles.container}
+              contentContainerStyle={styles.resultado}
+            >
+              <ThemedText type="small">Estimación aproximada</ThemedText>
+              <ThemedText type="title">
+                {analisis.calorias_totales} kcal
+              </ThemedText>
+
+              {analisis.alimentos.map((a, i) => (
+                <View key={i} style={styles.fila}>
+                  <View style={styles.filaTexto}>
+                    <ThemedText>{a.nombre}</ThemedText>
+                    <ThemedText type="small">{a.cantidad_estimada}</ThemedText>
+                  </View>
+                  <ThemedText>{a.calorias} kcal</ThemedText>
+                </View>
+              ))}
+
+              <Button title="Tomar otra foto" onPress={reiniciar} />
+            </ScrollView>
+          ) : null}
+        </SafeAreaView>
+      </ThemedView>
     );
   }
 
@@ -50,6 +136,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  centrado: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
   camera: {
     flex: 1,
   },
@@ -58,6 +150,21 @@ const styles = StyleSheet.create({
     backgroundColor: "black",
   },
   preview: {
+    width: "100%",
+    height: 220,
+  },
+  resultado: {
+    padding: 16,
+    gap: 12,
+    paddingBottom: BottomTabInset + 24,
+  },
+  fila: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  filaTexto: {
     flex: 1,
   },
 });
