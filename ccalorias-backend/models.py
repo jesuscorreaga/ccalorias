@@ -1,3 +1,5 @@
+from datetime import date, datetime
+
 from pydantic import BaseModel, EmailStr
 
 
@@ -32,3 +34,18 @@ class AlimentoDetectado(BaseModel):
 class AnalisisFoto(BaseModel):
     alimentos: list[AlimentoDetectado]
     calorias_totales: int
+
+
+class RegistroRespuesta(BaseModel):
+    id: str
+    calorias_estimadas: int
+    alimentos_detectados: list[AlimentoDetectado]
+    fecha_hora: datetime
+
+
+class ResumenDiario(BaseModel):
+    fecha: date
+    calorias_consumidas: int
+    meta_calorias_diaria: int
+    calorias_restantes: int
+    cantidad_comidas: int

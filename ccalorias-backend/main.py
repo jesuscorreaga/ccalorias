@@ -1,13 +1,18 @@
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 
+from bson import ObjectId
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from google import genai
 from google.genai import types
-from jose import jwt
+from jose import JWTError, jwt
 from models import (
     AnalisisFoto,
+    RegistroRespuesta,
+    ResumenDiario,
     TokenRespuesta,
     UsuarioLogin,
     UsuarioRegistro,
@@ -22,10 +27,20 @@ app = FastAPI()
 client = AsyncIOMotorClient(os.getenv("MONGO_URI"))
 db = client.ccalorias
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+bearer_scheme = HTTPBearer()
 
 JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRA_MINUTOS = 60 * 24 * 7
+
+TZ_LOCAL = ZoneInfo("America/Bogota")
+
+
+def rango_del_dia(dia: date):
+    inicio = datetime.combine(dia, time.min, tzinfo=TZ_LOCAL)
+    fin = inicio + timedelta(days=1)
+    return inicio, fin
+
 
 genai_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -36,39 +51,27 @@ Suma el total de calorías del plato completo.
 """
 
 
-@app.post("/analisis/foto", response_model=AnalisisFoto)
-async def analizar_foto(foto: UploadFile = File(...)):
-    imagen_bytes = await foto.read()
-
-    respuesta = genai_client.models.generate_content(
-        model="gemini-3.5-flash",
-        contents=[
-            types.Part.from_bytes(data=imagen_bytes, mime_type=foto.content_type),
-            PROMPT_ANALISIS,
-        ],
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=AnalisisFoto,
-        ),
-    )
-
-    return AnalisisFoto.model_validate_json(respuesta.text)
-
-
 def crear_token(usuario_id: str) -> str:
     expira = datetime.now(timezone.utc) + timedelta(minutes=JWT_EXPIRA_MINUTOS)
     payload = {"sub": usuario_id, "exp": expira}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-@app.post("/auth/login", response_model=TokenRespuesta)
-async def login_usuario(datos: UsuarioLogin):
-    usuario = await db.usuarios.find_one({"email": datos.email})
-    if not usuario or not pwd_context.verify(datos.password, usuario["password_hash"]):
-        raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
+async def get_usuario_actual(
+    credenciales: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+):
+    try:
+        payload = jwt.decode(
+            credenciales.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM]
+        )
+        usuario_id = payload.get("sub")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
 
-    token = crear_token(str(usuario["_id"]))
-    return TokenRespuesta(access_token=token)
+    usuario = await db.usuarios.find_one({"_id": ObjectId(usuario_id)})
+    if not usuario:
+        raise HTTPException(status_code=401, detail="Usuario no encontrado")
+    return usuario
 
 
 @app.get("/")
@@ -100,4 +103,111 @@ async def registrar_usuario(usuario: UsuarioRegistro):
         id=str(resultado.inserted_id),
         email=usuario.email,
         meta_calorias_diaria=usuario.meta_calorias_diaria,
+    )
+
+
+@app.post("/auth/login", response_model=TokenRespuesta)
+async def login_usuario(datos: UsuarioLogin):
+    usuario = await db.usuarios.find_one({"email": datos.email})
+    if not usuario or not pwd_context.verify(datos.password, usuario["password_hash"]):
+        raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
+
+    token = crear_token(str(usuario["_id"]))
+    return TokenRespuesta(access_token=token)
+
+
+@app.post("/analisis/foto", response_model=AnalisisFoto)
+async def analizar_foto(
+    foto: UploadFile = File(...),
+    usuario: dict = Depends(get_usuario_actual),
+):
+    imagen_bytes = await foto.read()
+
+    respuesta = await genai_client.aio.models.generate_content(
+        model="gemini-3.5-flash",
+        contents=[
+            types.Part.from_bytes(data=imagen_bytes, mime_type=foto.content_type),
+            PROMPT_ANALISIS,
+        ],
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=AnalisisFoto,
+        ),
+    )
+
+    analisis = AnalisisFoto.model_validate_json(respuesta.text)
+
+    await db.registros_comida.insert_one(
+        {
+            "usuario_id": usuario["_id"],
+            "foto_url": None,
+            "calorias_estimadas": analisis.calorias_totales,
+            "alimentos_detectados": [a.model_dump() for a in analisis.alimentos],
+            "fecha_hora": datetime.now(timezone.utc),
+        }
+    )
+
+    return analisis
+
+
+@app.get("/registros", response_model=list[RegistroRespuesta])
+async def listar_registros(
+    fecha: date | None = None,
+    usuario: dict = Depends(get_usuario_actual),
+):
+    dia = fecha or datetime.now(TZ_LOCAL).date()
+    inicio, fin = rango_del_dia(dia)
+
+    cursor = db.registros_comida.find(
+        {
+            "usuario_id": usuario["_id"],
+            "fecha_hora": {"$gte": inicio, "$lt": fin},
+        }
+    ).sort("fecha_hora", -1)
+
+    registros = []
+    async for r in cursor:
+        registros.append(
+            RegistroRespuesta(
+                id=str(r["_id"]),
+                calorias_estimadas=r["calorias_estimadas"],
+                alimentos_detectados=r["alimentos_detectados"],
+                fecha_hora=r["fecha_hora"].replace(tzinfo=timezone.utc),
+            )
+        )
+    return registros
+
+
+@app.get("/resumen/hoy", response_model=ResumenDiario)
+async def resumen_hoy(usuario: dict = Depends(get_usuario_actual)):
+    hoy = datetime.now(TZ_LOCAL).date()
+    inicio, fin = rango_del_dia(hoy)
+
+    pipeline = [
+        {
+            "$match": {
+                "usuario_id": usuario["_id"],
+                "fecha_hora": {"$gte": inicio, "$lt": fin},
+            }
+        },
+        {
+            "$group": {
+                "_id": None,
+                "total": {"$sum": "$calorias_estimadas"},
+                "cantidad": {"$sum": 1},
+            }
+        },
+    ]
+    resultado = await db.registros_comida.aggregate(pipeline).to_list(1)
+
+    consumidas = resultado[0]["total"] if resultado else 0
+    cantidad = resultado[0]["cantidad"] if resultado else 0
+    meta = usuario["meta_calorias_diaria"]
+
+    return ResumenDiario(
+        fecha=hoy,
+        calorias_consumidas=consumidas,
+        meta_calorias_diaria=meta,
+        calorias_restantes=meta - consumidas,
+        cantidad_comidas=cantidad,
     )
