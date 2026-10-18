@@ -103,3 +103,29 @@ export async function analizarFoto(uri: string): Promise<AnalisisFoto> {
   }
   return data;
 }
+export type ResumenDiario = {
+  fecha: string;
+  calorias_consumidas: number;
+  meta_calorias_diaria: number;
+  calorias_restantes: number;
+  cantidad_comidas: number;
+};
+
+export async function obtenerResumenHoy(): Promise<ResumenDiario> {
+  const token = await obtenerToken();
+  const res = await fetch(`${API_URL}/resumen/hoy`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => null);
+
+  if (res.status === 401) {
+    await borrarToken();
+    throw new Error("SESION_EXPIRADA");
+  }
+  if (!res.ok) {
+    throw new Error(
+      mensajeDeError(data?.detail, "No se pudo cargar el resumen"),
+    );
+  }
+  return data;
+}

@@ -12,10 +12,17 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { LoginForm } from "@/components/login-form";
+import { ResumenDia } from "@/components/resumen-dia";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { BottomTabInset } from "@/constants/theme";
-import { type AnalisisFoto, analizarFoto, obtenerToken } from "@/lib/api";
+import {
+  type AnalisisFoto,
+  analizarFoto,
+  obtenerResumenHoy,
+  obtenerToken,
+  type ResumenDiario,
+} from "@/lib/api";
 
 export default function HomeScreen() {
   const [autenticado, setAutenticado] = useState<boolean | null>(null);
@@ -24,10 +31,25 @@ export default function HomeScreen() {
   const [analisis, setAnalisis] = useState<AnalisisFoto | null>(null);
   const [cargando, setCargando] = useState(false);
   const cameraRef = useRef<CameraView>(null);
+  const [resumen, setResumen] = useState<ResumenDiario | null>(null);
 
   useEffect(() => {
     obtenerToken().then((token) => setAutenticado(!!token));
   }, []);
+
+  async function cargarResumen() {
+    try {
+      setResumen(await obtenerResumenHoy());
+    } catch (e) {
+      if (e instanceof Error && e.message === "SESION_EXPIRADA") {
+        setAutenticado(false);
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (autenticado) cargarResumen();
+  }, [autenticado]);
 
   function reiniciar() {
     setPhotoUri(null);
@@ -43,6 +65,7 @@ export default function HomeScreen() {
     setCargando(true);
     try {
       setAnalisis(await analizarFoto(photo.uri));
+      cargarResumen();
     } catch (e) {
       reiniciar();
       if (e instanceof Error && e.message === "SESION_EXPIRADA") {
@@ -124,6 +147,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <ResumenDia resumen={resumen} />
       <CameraView ref={cameraRef} style={styles.camera} facing="back" />
       <SafeAreaView style={styles.buttonRow}>
         <Button title="Tomar foto" onPress={takePicture} />

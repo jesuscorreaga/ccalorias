@@ -18,9 +18,12 @@ export function LoginForm({ onSuccess }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function enviar() {
+    setError(null);
     if (!email || !password) {
+      setError("Ingresa tu email y contraseña");
       Alert.alert("Faltan datos", "Ingresa tu email y contraseña");
       return;
     }
@@ -33,7 +36,9 @@ export function LoginForm({ onSuccess }: Props) {
       }
       onSuccess();
     } catch (e) {
-      Alert.alert("Error", e instanceof Error ? e.message : "Algo salió mal");
+      const mensaje = e instanceof Error ? e.message : "Algo salió mal";
+      setError(mensaje);
+      Alert.alert("Error", mensaje);
     } finally {
       setCargando(false);
     }
@@ -59,6 +64,8 @@ export function LoginForm({ onSuccess }: Props) {
         onChangeText={setPassword}
       />
 
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+
       <Pressable style={styles.boton} onPress={enviar} disabled={cargando}>
         {cargando ? (
           <ActivityIndicator color="white" />
@@ -69,7 +76,12 @@ export function LoginForm({ onSuccess }: Props) {
         )}
       </Pressable>
 
-      <Pressable onPress={() => setModoRegistro(!modoRegistro)}>
+      <Pressable
+        onPress={() => {
+          setModoRegistro(!modoRegistro);
+          setError(null);
+        }}
+      >
         <Text style={styles.enlace}>
           {modoRegistro
             ? "¿Ya tienes cuenta? Inicia sesión"
@@ -99,6 +111,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+  },
+  error: {
+    color: "#d32f2f",
+    textAlign: "center",
   },
   boton: {
     backgroundColor: "#2f7de1",
