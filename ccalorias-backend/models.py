@@ -32,6 +32,7 @@ class AlimentoDetectado(BaseModel):
 
 
 class AnalisisFoto(BaseModel):
+    contiene_comida: bool
     alimentos: list[AlimentoDetectado]
     calorias_totales: int
 
