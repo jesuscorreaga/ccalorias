@@ -1,30 +1,26 @@
-import { useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { login, registrar } from "@/lib/api";
+import { BotonGrande } from '@/components/ui/boton-grande';
+import { useTheme } from '@/hooks/use-theme';
+import { login, registrar } from '@/lib/api';
 
 type Props = { onSuccess: () => void };
 
 export function LoginForm({ onSuccess }: Props) {
+  const theme = useTheme();
   const [modoRegistro, setModoRegistro] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function enviar() {
     setError(null);
     if (!email || !password) {
-      setError("Ingresa tu email y contraseña");
-      Alert.alert("Faltan datos", "Ingresa tu email y contraseña");
+      setError('Ingresa tu email y contraseña');
+      Alert.alert('Faltan datos', 'Ingresa tu email y contraseña');
       return;
     }
     setCargando(true);
@@ -36,58 +32,67 @@ export function LoginForm({ onSuccess }: Props) {
       }
       onSuccess();
     } catch (e) {
-      const mensaje = e instanceof Error ? e.message : "Algo salió mal";
+      const mensaje = e instanceof Error ? e.message : 'Algo salió mal';
       setError(mensaje);
-      Alert.alert("Error", mensaje);
+      Alert.alert('Error', mensaje);
     } finally {
       setCargando(false);
     }
   }
 
+  const estiloInput = [
+    styles.input,
+    {
+      backgroundColor: theme.backgroundElement,
+      borderColor: theme.border,
+      color: theme.text,
+    },
+  ];
+
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.titulo}>Ccalorias</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={styles.columna}>
+        <Text style={[styles.titulo, { color: theme.primary }]}>Ccalorias</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Contraseña"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+        <TextInput
+          style={estiloInput}
+          placeholder="Email"
+          placeholderTextColor={theme.textSecondary}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          value={email}
+          onChangeText={setEmail}
+        />
+        <TextInput
+          style={estiloInput}
+          placeholder="Contraseña"
+          placeholderTextColor={theme.textSecondary}
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+        />
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <Text style={[styles.error, { color: theme.danger }]}>{error}</Text> : null}
 
-      <Pressable style={styles.boton} onPress={enviar} disabled={cargando}>
-        {cargando ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <Text style={styles.botonTexto}>
-            {modoRegistro ? "Crear cuenta" : "Entrar"}
+        <BotonGrande
+          titulo={modoRegistro ? 'Crear cuenta' : 'Entrar'}
+          onPress={enviar}
+          cargando={cargando}
+          style={styles.boton}
+        />
+
+        <Pressable
+          onPress={() => {
+            setModoRegistro(!modoRegistro);
+            setError(null);
+          }}>
+          <Text style={[styles.enlace, { color: theme.primary }]}>
+            {modoRegistro
+              ? '¿Ya tienes cuenta? Inicia sesión'
+              : '¿No tienes cuenta? Regístrate'}
           </Text>
-        )}
-      </Pressable>
-
-      <Pressable
-        onPress={() => {
-          setModoRegistro(!modoRegistro);
-          setError(null);
-        }}
-      >
-        <Text style={styles.enlace}>
-          {modoRegistro
-            ? "¿Ya tienes cuenta? Inicia sesión"
-            : "¿No tienes cuenta? Regístrate"}
-        </Text>
-      </Pressable>
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }
@@ -95,42 +100,36 @@ export function LoginForm({ onSuccess }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: 24,
+  },
+  columna: {
+    width: '100%',
+    maxWidth: 420,
     gap: 12,
   },
   titulo: {
-    fontSize: 32,
-    fontWeight: "600",
-    textAlign: "center",
+    fontSize: 36,
+    fontWeight: '800',
+    textAlign: 'center',
     marginBottom: 24,
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 12,
+    borderWidth: 2,
+    borderRadius: 14,
+    padding: 14,
     fontSize: 16,
   },
   error: {
-    color: "#d32f2f",
-    textAlign: "center",
+    textAlign: 'center',
   },
   boton: {
-    backgroundColor: "#2f7de1",
-    borderRadius: 8,
-    padding: 14,
-    alignItems: "center",
     marginTop: 8,
-  },
-  botonTexto: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
   },
   enlace: {
-    color: "#2f7de1",
-    textAlign: "center",
+    textAlign: 'center',
     marginTop: 8,
+    fontWeight: '600',
   },
 });
