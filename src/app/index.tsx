@@ -27,6 +27,7 @@ export default function HomeScreen() {
   const [cargando, setCargando] = useState(false);
   const cameraRef = useRef<CameraView>(null);
   const [resumen, setResumen] = useState<ResumenDiario | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     obtenerToken().then((token) => setAutenticado(!!token));
@@ -63,7 +64,11 @@ export default function HomeScreen() {
     const photo = await cameraRef.current.takePictureAsync({ quality: 0.6 });
     if (!photo) return;
 
+<<<<<<< HEAD
     // Al tomar la foto se pasa a la pantalla de resultados
+=======
+    setError(null);
+>>>>>>> origin/main
     setPhotoUri(photo.uri);
     setCargando(true);
     try {
@@ -74,7 +79,9 @@ export default function HomeScreen() {
       if (e instanceof Error && e.message === "SESION_EXPIRADA") {
         setAutenticado(false);
       } else {
-        Alert.alert("Error", e instanceof Error ? e.message : "Algo salió mal");
+        const mensaje = e instanceof Error ? e.message : "Algo salió mal";
+        setError(mensaje);
+        Alert.alert("Error", mensaje);
       }
     } finally {
       setCargando(false);
@@ -130,6 +137,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={[styles.container, fondo]}>
       <ResumenDia resumen={resumen} />
+      {error ? <ThemedText style={styles.error}>{error}</ThemedText> : null}
       <CameraView ref={cameraRef} style={styles.camera} facing="back" />
       <SafeAreaView
         style={[
@@ -171,6 +179,11 @@ const styles = StyleSheet.create({
   },
   camera: {
     flex: 1,
+  },
+  error: {
+    color: "#d32f2f",
+    textAlign: "center",
+    padding: 8,
   },
   buttonRow: {
     flexDirection: "row",

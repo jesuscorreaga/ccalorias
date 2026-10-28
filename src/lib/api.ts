@@ -6,6 +6,22 @@ export const API_URL =
 
 const TOKEN_KEY = "token";
 
+async function fetchConTimeout(
+  url: string,
+  options: RequestInit = {},
+  ms = 30000,
+) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch {
+    throw new Error("No se pudo conectar con el servidor, revisa tu conexión");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function guardarToken(token: string) {
   if (Platform.OS === "web") {
     localStorage.setItem(TOKEN_KEY, token);
@@ -32,7 +48,7 @@ function mensajeDeError(detail: unknown, porDefecto: string) {
 }
 
 export async function login(email: string, password: string) {
-  const res = await fetch(`${API_URL}/auth/login`, {
+  const res = await fetchConTimeout(`${API_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -45,7 +61,7 @@ export async function login(email: string, password: string) {
 }
 
 export async function registrar(email: string, password: string) {
-  const res = await fetch(`${API_URL}/auth/register`, {
+  const res = await fetchConTimeout(`${API_URL}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -66,6 +82,7 @@ export type AlimentoDetectado = {
 };
 
 export type AnalisisFoto = {
+  contiene_comida: boolean;
   alimentos: AlimentoDetectado[];
   calorias_totales: number;
 };
@@ -105,6 +122,7 @@ export async function analizarFoto(uri: string): Promise<AnalisisFoto> {
   }
   return data;
 }
+
 export type ResumenDiario = {
   fecha: string;
   calorias_consumidas: number;
@@ -115,7 +133,7 @@ export type ResumenDiario = {
 
 export async function obtenerResumenHoy(): Promise<ResumenDiario> {
   const token = await obtenerToken();
-  const res = await fetch(`${API_URL}/resumen/hoy`, {
+  const res = await fetchConTimeout(`${API_URL}/resumen/hoy`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json().catch(() => null);
@@ -127,6 +145,31 @@ export async function obtenerResumenHoy(): Promise<ResumenDiario> {
   if (!res.ok) {
     throw new Error(
       mensajeDeError(data?.detail, "No se pudo cargar el resumen"),
+    );
+  }
+  return data;
+}
+export type RegistroComida = {
+  id: string;
+  calorias_estimadas: number;
+  alimentos_detectados: AlimentoDetectado[];
+  fecha_hora: string;
+};
+
+export async function obtenerRegistrosHoy(): Promise<RegistroComida[]> {
+  const token = await obtenerToken();
+  const res = await fetchConTimeout(`${API_URL}/registros`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => null);
+
+  if (res.status === 401) {
+    await borrarToken();
+    throw new Error("SESION_EXPIRADA");
+  }
+  if (!res.ok) {
+    throw new Error(
+      mensajeDeError(data?.detail, "No se pudo cargar el historial"),
     );
   }
   return data;
