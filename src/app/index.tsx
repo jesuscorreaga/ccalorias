@@ -1,21 +1,13 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  ScrollView,
-  StyleSheet,
-  View,
-} from "react-native";
+import { ActivityIndicator, Alert, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { LoginForm } from "@/components/login-form";
+import { PantallaResultado } from "@/components/pantalla-resultado";
 import { ResumenDia } from "@/components/resumen-dia";
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { BotonGrande } from "@/components/ui/boton-grande";
-import { BottomTabInset } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import {
   type AnalisisFoto,
@@ -71,6 +63,7 @@ export default function HomeScreen() {
     const photo = await cameraRef.current.takePictureAsync({ quality: 0.6 });
     if (!photo) return;
 
+    // Al tomar la foto se pasa a la pantalla de resultados
     setPhotoUri(photo.uri);
     setCargando(true);
     try {
@@ -120,74 +113,20 @@ export default function HomeScreen() {
     );
   }
 
+  // ---- Pantalla 2: resultados (después de tomar la foto) ----
   if (photoUri) {
-    const sinComida =
-      analisis && analisis.alimentos.length === 0 && analisis.calorias_totales === 0;
-
     return (
-      <ThemedView style={styles.container}>
-        <SafeAreaView style={styles.container}>
-          <Image
-            source={{ uri: photoUri }}
-            style={styles.preview}
-            resizeMode="cover"
-          />
-
-          {cargando ? (
-            <View style={[styles.centrado, fondo]}>
-              <ActivityIndicator size="large" color={theme.primary} />
-              <ThemedText>Analizando tu plato...</ThemedText>
-            </View>
-          ) : analisis ? (
-            <ScrollView
-              style={styles.container}
-              contentContainerStyle={styles.resultado}
-            >
-              <ThemedText type="small" themeColor="textSecondary">
-                Estimación aproximada
-              </ThemedText>
-              <ThemedText type="title" themeColor="accent">
-                {analisis.calorias_totales} kcal
-              </ThemedText>
-
-              {sinComida ? (
-                <ThemedText themeColor="textSecondary">
-                  No detectamos comida en la foto. Intenta de nuevo con más luz
-                  y enfocando el plato.
-                </ThemedText>
-              ) : null}
-
-              {analisis.alimentos.map((a, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.fila,
-                    {
-                      backgroundColor: theme.backgroundElement,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                >
-                  <View style={styles.filaTexto}>
-                    <ThemedText style={styles.negrita}>{a.nombre}</ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {a.cantidad_estimada}
-                    </ThemedText>
-                  </View>
-                  <ThemedText themeColor="accent" style={styles.negrita}>
-                    {a.calorias} kcal
-                  </ThemedText>
-                </View>
-              ))}
-
-              <BotonGrande titulo="Tomar otra foto" onPress={reiniciar} />
-            </ScrollView>
-          ) : null}
-        </SafeAreaView>
-      </ThemedView>
+      <PantallaResultado
+        fotoUri={photoUri}
+        analisis={analisis}
+        cargando={cargando}
+        resumen={resumen}
+        onNuevaFoto={reiniciar}
+      />
     );
   }
 
+  // ---- Pantalla 1: cámara ----
   return (
     <SafeAreaView style={[styles.container, fondo]}>
       <ResumenDia resumen={resumen} />
@@ -244,29 +183,5 @@ const styles = StyleSheet.create({
   },
   botonSalir: {
     flex: 1,
-  },
-  preview: {
-    width: "100%",
-    height: 220,
-  },
-  resultado: {
-    padding: 16,
-    gap: 12,
-    paddingBottom: BottomTabInset + 24,
-  },
-  fila: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  filaTexto: {
-    flex: 1,
-  },
-  negrita: {
-    fontWeight: "700",
   },
 });
