@@ -1,6 +1,13 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Platform,
+  StyleSheet,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { LoginForm } from "@/components/login-form";
@@ -20,6 +27,7 @@ import {
 
 export default function HomeScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const [autenticado, setAutenticado] = useState<boolean | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -28,10 +36,26 @@ export default function HomeScreen() {
   const cameraRef = useRef<CameraView>(null);
   const [resumen, setResumen] = useState<ResumenDiario | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const primerFoco = useRef(true);
+  const yaPidioPermiso = useRef(false);
 
-  useEffect(() => {
-    obtenerToken().then((token) => setAutenticado(!!token));
-  }, []);
+  // Cada vez que se abre esta pestaña revisa si hay sesión (por si se cerró o
+  // venció desde el diario) y actualiza el resumen del día.
+  useFocusEffect(
+    useCallback(() => {
+      let activo = true;
+      const esPrimero = primerFoco.current;
+      primerFoco.current = false;
+      obtenerToken().then((token) => {
+        if (!activo) return;
+        setAutenticado(!!token);
+        if (token && !esPrimero) cargarResumen();
+      });
+      return () => {
+        activo = false;
+      };
+    }, []),
+  );
 
   async function cargarResumen() {
     try {
@@ -47,14 +71,34 @@ export default function HomeScreen() {
     if (autenticado) cargarResumen();
   }, [autenticado]);
 
+  // Si falta el permiso de cámara, la app lo pide automáticamente (una vez).
+  useEffect(() => {
+    if (
+      autenticado &&
+      permission &&
+      !permission.granted &&
+      permission.canAskAgain &&
+      !yaPidioPermiso.current
+    ) {
+      yaPidioPermiso.current = true;
+      requestPermission();
+    }
+  }, [autenticado, permission, requestPermission]);
+
   function reiniciar() {
     setPhotoUri(null);
     setAnalisis(null);
   }
 
+  function verDiario() {
+    reiniciar();
+    router.navigate("/explore");
+  }
+
   async function cerrarSesion() {
     await borrarToken();
     reiniciar();
+    setError(null);
     setResumen(null);
     setAutenticado(false);
   }
@@ -64,16 +108,15 @@ export default function HomeScreen() {
     const photo = await cameraRef.current.takePictureAsync({ quality: 0.6 });
     if (!photo) return;
 
-<<<<<<< HEAD
-    // Al tomar la foto se pasa a la pantalla de resultados
-=======
     setError(null);
->>>>>>> origin/main
     setPhotoUri(photo.uri);
     setCargando(true);
     try {
-      setAnalisis(await analizarFoto(photo.uri));
-      cargarResumen();
+      const resultado = await analizarFoto(photo.uri);
+      // Actualiza el resumen antes de mostrar el resultado, así el medidor
+      // del día ya incluye esta comida.
+      await cargarResumen();
+      setAnalisis(resultado);
     } catch (e) {
       reiniciar();
       if (e instanceof Error && e.message === "SESION_EXPIRADA") {
@@ -110,17 +153,26 @@ export default function HomeScreen() {
     return (
       <SafeAreaView style={[styles.centrado, styles.padding, fondo]}>
         <ThemedText style={styles.centrarTexto}>
-          Necesitamos tu cámara para analizar tus platos.
+          {permission.canAskAgain
+            ? "Necesitamos tu cámara para analizar tus platos."
+            : "El permiso de cámara está desactivado. Actívalo en los ajustes para poder analizar tus platos."}
         </ThemedText>
-        <BotonGrande
-          titulo="Dar permiso de cámara"
-          onPress={requestPermission}
-        />
+        {permission.canAskAgain ? (
+          <BotonGrande
+            titulo="Dar permiso de cámara"
+            onPress={requestPermission}
+          />
+        ) : Platform.OS !== "web" ? (
+          <BotonGrande
+            titulo="Abrir ajustes"
+            onPress={() => Linking.openSettings()}
+          />
+        ) : null}
       </SafeAreaView>
     );
   }
 
-  // ---- Pantalla 2: resultados (después de tomar la foto) ----
+  // Resultados (después de tomar la foto)
   if (photoUri) {
     return (
       <PantallaResultado
@@ -129,15 +181,20 @@ export default function HomeScreen() {
         cargando={cargando}
         resumen={resumen}
         onNuevaFoto={reiniciar}
+        onVerDiario={verDiario}
       />
     );
   }
 
-  // ---- Pantalla 1: cámara ----
+  // Cámara
   return (
     <SafeAreaView style={[styles.container, fondo]}>
       <ResumenDia resumen={resumen} />
-      {error ? <ThemedText style={styles.error}>{error}</ThemedText> : null}
+      {error ? (
+        <ThemedText themeColor="danger" style={styles.error}>
+          {error}
+        </ThemedText>
+      ) : null}
       <CameraView ref={cameraRef} style={styles.camera} facing="back" />
       <SafeAreaView
         style={[
@@ -181,7 +238,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   error: {
-    color: "#d32f2f",
     textAlign: "center",
     padding: 8,
   },

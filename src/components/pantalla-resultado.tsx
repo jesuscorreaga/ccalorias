@@ -22,6 +22,8 @@ type Props = {
   cargando: boolean;
   resumen: ResumenDiario | null;
   onNuevaFoto: () => void;
+  /** Si se pasa, aparece el botón "Ver mi diario". */
+  onVerDiario?: () => void;
 };
 
 /**
@@ -34,13 +36,14 @@ export function PantallaResultado({
   cargando,
   resumen,
   onNuevaFoto,
+  onVerDiario,
 }: Props) {
   const theme = useTheme();
 
   const sinComida =
     !!analisis &&
-    analisis.alimentos.length === 0 &&
-    analisis.calorias_totales === 0;
+    (analisis.contiene_comida === false ||
+      (analisis.alimentos.length === 0 && analisis.calorias_totales === 0));
 
   const restantes = resumen?.calorias_restantes ?? 0;
   const excedido = restantes < 0;
@@ -147,6 +150,13 @@ export function PantallaResultado({
               ) : null}
 
               <BotonGrande titulo="Tomar otra foto" onPress={onNuevaFoto} />
+              {onVerDiario ? (
+                <BotonGrande
+                  titulo="Ver mi diario"
+                  variante="secundario"
+                  onPress={onVerDiario}
+                />
+              ) : null}
             </>
           ) : null}
         </View>

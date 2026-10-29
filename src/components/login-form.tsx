@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -15,8 +15,10 @@ export function LoginForm({ onSuccess }: Props) {
   const [password, setPassword] = useState('');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   async function enviar() {
+    if (cargando) return;
     setError(null);
     if (!email || !password) {
       setError('Ingresa tu email y contraseña');
@@ -59,17 +61,25 @@ export function LoginForm({ onSuccess }: Props) {
           placeholder="Email"
           placeholderTextColor={theme.textSecondary}
           autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
           keyboardType="email-address"
+          returnKeyType="next"
           value={email}
           onChangeText={setEmail}
+          onSubmitEditing={() => passwordRef.current?.focus()}
         />
         <TextInput
+          ref={passwordRef}
           style={estiloInput}
           placeholder="Contraseña"
           placeholderTextColor={theme.textSecondary}
           secureTextEntry
+          autoComplete={modoRegistro ? 'new-password' : 'current-password'}
+          returnKeyType="go"
           value={password}
           onChangeText={setPassword}
+          onSubmitEditing={enviar}
         />
 
         {error ? <Text style={[styles.error, { color: theme.danger }]}>{error}</Text> : null}

@@ -34,6 +34,12 @@ export const Colors = {
     // Acentos
     accent: '#F05AB5', // calorías, progreso
     danger: '#FF6B6B', // alertas / te pasaste de la meta
+
+    // Macros y agua (diario)
+    macroProteina: '#A78BFA',
+    macroCarbos: '#FFC857',
+    macroGrasas: '#4ADEB0',
+    agua: '#38BDF8',
   },
   light: {
     background: '#FAF7FA',
@@ -51,6 +57,11 @@ export const Colors = {
 
     accent: '#D63A9A',
     danger: '#D32F2F',
+
+    macroProteina: '#7C5CE6',
+    macroCarbos: '#E09A00',
+    macroGrasas: '#12A57A',
+    agua: '#0A8FD1',
   },
 } as const;
 
