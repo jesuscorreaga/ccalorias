@@ -1,8 +1,14 @@
+/**
+ * Learn more about light and dark modes:
+ * https://docs.expo.dev/guides/color-schemes/
+ */
+
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-/** Devuelve los colores del tema activo (oscuro por defecto). */
 export function useTheme() {
   const scheme = useColorScheme();
-  return Colors[scheme];
+  const theme = scheme === 'unspecified' ? 'light' : scheme;
+
+  return Colors[theme];
 }

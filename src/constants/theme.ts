@@ -1,12 +1,6 @@
 /**
- * Paleta de Ccalorias.
- * Paleta "Negro + magenta".
- * - El tema OSCURO es el principal (por defecto).
- * - El tema claro existe para que el usuario pueda cambiarlo en Ajustes.
- *
- * Para usar un color en cualquier componente:
- *   const theme = useTheme();
- *   <View style={{ backgroundColor: theme.backgroundElement }} />
+ * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
+ * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
  */
 
 import '@/global.css';
@@ -14,54 +8,19 @@ import '@/global.css';
 import { Platform } from 'react-native';
 
 export const Colors = {
-  dark: {
-    // Fondos
-    background: '#1C1B20', // fondo principal (carbón)
-    backgroundElement: '#302831', // tarjetas, paneles, inputs
-    backgroundSelected: '#3F3441', // elemento seleccionado / pista de barras
-    border: '#463A48',
-
-    // Texto
-    text: '#FAF7FA',
-    textSecondary: '#B5AAB4',
-
-    // Marca
-    primary: '#F05AB5', // magenta: títulos, enlaces, estado activo
-    button: '#F05AB5', // botón de acción principal (CTA)
-    buttonShadow: '#B03E86', // "borde 3D" inferior del botón
-    onButton: '#1C1B20', // texto sobre el botón (oscuro para buen contraste)
-
-    // Acentos
-    accent: '#F05AB5', // calorías, progreso
-    danger: '#FF6B6B', // alertas / te pasaste de la meta
-
-    // Macros y agua (diario)
-    macroProteina: '#A78BFA',
-    macroCarbos: '#FFC857',
-    macroGrasas: '#4ADEB0',
-    agua: '#38BDF8',
-  },
   light: {
-    background: '#FAF7FA',
-    backgroundElement: '#FFFFFF',
-    backgroundSelected: '#F4E6F1',
-    border: '#E7D8E4',
-
-    text: '#1C1B20',
-    textSecondary: '#6E626D',
-
-    primary: '#D63A9A', // magenta más oscuro para que se lea sobre fondo claro
-    button: '#D63A9A',
-    buttonShadow: '#A82578',
-    onButton: '#FFFFFF',
-
-    accent: '#D63A9A',
-    danger: '#D32F2F',
-
-    macroProteina: '#7C5CE6',
-    macroCarbos: '#E09A00',
-    macroGrasas: '#12A57A',
-    agua: '#0A8FD1',
+    text: '#000000',
+    background: '#ffffff',
+    backgroundElement: '#F0F0F3',
+    backgroundSelected: '#E0E1E6',
+    textSecondary: '#60646C',
+  },
+  dark: {
+    text: '#ffffff',
+    background: '#000000',
+    backgroundElement: '#212225',
+    backgroundSelected: '#2E3135',
+    textSecondary: '#B0B4BA',
   },
 } as const;
 
