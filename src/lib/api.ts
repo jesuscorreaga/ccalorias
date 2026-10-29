@@ -89,26 +89,28 @@ export type AnalisisFoto = {
 
 export async function analizarFoto(uri: string): Promise<AnalisisFoto> {
   const token = await obtenerToken();
-  const url = `${API_URL}/analisis/foto`;
-  const headers = { Authorization: `Bearer ${token}` };
-  const formData = new FormData();
-  let res: Response;
 
+  const formData = new FormData();
   if (Platform.OS === "web") {
     const blob = await (await fetch(uri)).blob();
     formData.append("foto", blob, "foto.jpg");
-    res = await fetch(url, { method: "POST", headers, body: formData });
   } else {
-    const { File } = await import("expo-file-system");
-    const { fetch: expoFetch } = await import("expo/fetch");
-    formData.append("foto", new File(uri) as unknown as Blob);
-    res = (await expoFetch(url, {
-      method: "POST",
-      headers,
-      body: formData,
-    })) as unknown as Response;
+    formData.append("foto", {
+      uri,
+      name: "foto.jpg",
+      type: "image/jpeg",
+    } as unknown as Blob);
   }
 
+  const res = await fetchConTimeout(
+    `${API_URL}/analisis/foto`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    },
+    60000,
+  );
   const data = await res.json().catch(() => null);
 
   if (res.status === 401) {
