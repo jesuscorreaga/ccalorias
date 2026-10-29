@@ -1,6 +1,6 @@
 import asyncio
 import os
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -15,6 +15,7 @@ from google.genai import types
 from jose import JWTError, jwt
 from models import (
     AnalisisFoto,
+    MetaCaloriasActualizar,
     RegistroRespuesta,
     ResumenDiario,
     TokenRespuesta,
@@ -68,6 +69,8 @@ No inventes alimentos.
 """
 
 
+
+
 async def generar_con_reintentos(contents, config, intentos=3):
     for intento in range(intentos):
         try:
@@ -83,7 +86,7 @@ async def generar_con_reintentos(contents, config, intentos=3):
 
 
 def crear_token(usuario_id: str) -> str:
-    expira = datetime.now(timezone.utc) + timedelta(minutes=JWT_EXPIRA_MINUTOS)
+    expira = datetime.now(UTC) + timedelta(minutes=JWT_EXPIRA_MINUTOS)
     payload = {"sub": usuario_id, "exp": expira}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
@@ -190,7 +193,7 @@ async def analizar_foto(
             "foto_url": None,
             "calorias_estimadas": analisis.calorias_totales,
             "alimentos_detectados": [a.model_dump() for a in analisis.alimentos],
-            "fecha_hora": datetime.now(timezone.utc),
+            "fecha_hora": datetime.now(UTC),
         }
     )
 
@@ -219,7 +222,7 @@ async def listar_registros(
                 id=str(r["_id"]),
                 calorias_estimadas=r["calorias_estimadas"],
                 alimentos_detectados=r["alimentos_detectados"],
-                fecha_hora=r["fecha_hora"].replace(tzinfo=timezone.utc),
+                fecha_hora=r["fecha_hora"].replace(tzinfo=UTC),
             )
         )
     return registros
@@ -258,3 +261,23 @@ async def resumen_hoy(usuario: dict = Depends(get_usuario_actual)):
         calorias_restantes=meta - consumidas,
         cantidad_comidas=cantidad,
     )
+@app.patch("/usuario/meta")
+async def cambiar_meta_calorias(
+    datos: MetaCaloriasActualizar,
+    usuario: dict = Depends(get_usuario_actual),
+):
+    resultado = await db.usuarios.update_one(
+        {"_id": usuario["_id"]},
+        {"$set": {"meta_calorias_diaria": datos.meta_calorias_diaria}},
+    )
+
+    if resultado.matched_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="Usuario no encontrado",
+        )
+
+    return {
+        "mensaje": "Meta diaria actualizada correctamente",
+        "meta_calorias_diaria": datos.meta_calorias_diaria,
+    }

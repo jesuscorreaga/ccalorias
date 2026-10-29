@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class UsuarioRegistro(BaseModel):
@@ -50,3 +50,7 @@ class ResumenDiario(BaseModel):
     meta_calorias_diaria: int
     calorias_restantes: int
     cantidad_comidas: int
+
+
+class MetaCaloriasActualizar(BaseModel):
+    meta_calorias_diaria: int = Field(ge=800, le=6000)
