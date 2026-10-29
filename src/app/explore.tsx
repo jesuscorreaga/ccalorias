@@ -1,8 +1,9 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 
-import { PantallaDiario } from "@/components/diario/pantalla-diario";
 import { borrarToken, obtenerResumenHoy } from "@/lib/api";
+import { PantallaDiario } from "@/components/diario/pantalla-diario";
+
 
 /**
  * Pestaña Explore = diario de comidas (antes era el Historial de "Comidas de hoy").

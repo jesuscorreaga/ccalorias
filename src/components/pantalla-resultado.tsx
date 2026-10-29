@@ -59,7 +59,11 @@ export function PantallaResultado({
       >
         <View style={styles.columna}>
           <View style={styles.fotoWrap}>
-            <Image source={{ uri: fotoUri }} style={styles.foto} resizeMode="cover" />
+            <Image
+              source={{ uri: fotoUri }}
+              style={styles.foto}
+              resizeMode="cover"
+            />
             {cargando ? (
               <View style={styles.overlay}>
                 <ActivityIndicator size="large" color={theme.primary} />
@@ -136,7 +140,9 @@ export function PantallaResultado({
                       ]}
                     >
                       <View style={styles.filaTexto}>
-                        <ThemedText style={styles.negrita}>{a.nombre}</ThemedText>
+                        <ThemedText style={styles.negrita}>
+                          {a.nombre}
+                        </ThemedText>
                         <ThemedText type="small" themeColor="textSecondary">
                           {a.cantidad_estimada}
                         </ThemedText>
@@ -192,7 +198,11 @@ const styles = StyleSheet.create({
     height: 200,
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: "center",
     justifyContent: "center",
     gap: 12,
