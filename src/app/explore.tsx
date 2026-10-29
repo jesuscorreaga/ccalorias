@@ -2,6 +2,7 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Button,
   Platform,
   ScrollView,
   StyleSheet,
@@ -24,27 +25,29 @@ function hora(iso: string) {
 export default function HistorialScreen() {
   const [registros, setRegistros] = useState<RegistroComida[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cargando, setCargando] = useState(false);
+
+  const cargar = useCallback(async () => {
+    setCargando(true);
+    setError(null);
+    try {
+      setRegistros(await obtenerRegistrosHoy());
+    } catch (e) {
+      setRegistros(null);
+      if (e instanceof Error && e.message === "SESION_EXPIRADA") {
+        setError("Tu sesión venció. Vuelve a Home e inicia sesión.");
+      } else {
+        setError(e instanceof Error ? e.message : "Algo salió mal");
+      }
+    } finally {
+      setCargando(false);
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      let activo = true;
-      setError(null);
-      obtenerRegistrosHoy()
-        .then((datos) => {
-          if (activo) setRegistros(datos);
-        })
-        .catch((e) => {
-          if (!activo) return;
-          if (e instanceof Error && e.message === "SESION_EXPIRADA") {
-            setError("Tu sesión venció. Vuelve a Home e inicia sesión.");
-          } else {
-            setError(e instanceof Error ? e.message : "Algo salió mal");
-          }
-        });
-      return () => {
-        activo = false;
-      };
-    }, []),
+      cargar();
+    }, [cargar]),
   );
 
   const total =
@@ -56,9 +59,14 @@ export default function HistorialScreen() {
         <ScrollView contentContainerStyle={styles.contenido}>
           <ThemedText type="title">Comidas de hoy</ThemedText>
 
-          {error ? <ThemedText style={styles.error}>{error}</ThemedText> : null}
+          {error ? (
+            <View style={styles.bloqueError}>
+              <ThemedText style={styles.error}>{error}</ThemedText>
+              <Button title="Reintentar" onPress={cargar} />
+            </View>
+          ) : null}
 
-          {!error && registros === null ? (
+          {cargando && registros === null && !error ? (
             <ActivityIndicator size="large" />
           ) : null}
 
@@ -82,16 +90,33 @@ export default function HistorialScreen() {
                   type="backgroundElement"
                   style={styles.tarjeta}
                 >
-                  <View style={styles.filaTexto}>
+                  <View style={styles.encabezado}>
                     <ThemedText type="small">{hora(r.fecha_hora)}</ThemedText>
-                    <ThemedText>
-                      {r.alimentos_detectados.map((a) => a.nombre).join(", ")}
-                    </ThemedText>
+                    <ThemedText>{r.calorias_estimadas} kcal</ThemedText>
                   </View>
-                  <ThemedText>{r.calorias_estimadas} kcal</ThemedText>
+
+                  {r.alimentos_detectados.map((a, i) => (
+                    <View key={i} style={styles.alimento}>
+                      <View style={styles.filaTexto}>
+                        <ThemedText>{a.nombre}</ThemedText>
+                        <ThemedText type="small">
+                          {a.cantidad_estimada}
+                        </ThemedText>
+                      </View>
+                      <ThemedText type="small">{a.calorias} kcal</ThemedText>
+                    </View>
+                  ))}
                 </ThemedView>
               ))}
             </>
+          ) : null}
+
+          {!error ? (
+            <Button
+              title="Actualizar"
+              onPress={cargar}
+              disabled={cargando}
+            />
           ) : null}
         </ScrollView>
       </SafeAreaView>
@@ -110,16 +135,27 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   tarjeta: {
+    padding: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  encabezado: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  alimento: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     gap: 12,
-    padding: 12,
-    borderRadius: 12,
   },
   filaTexto: {
     flex: 1,
     gap: 2,
+  },
+  bloqueError: {
+    gap: 8,
   },
   error: {
     color: "#d32f2f",
