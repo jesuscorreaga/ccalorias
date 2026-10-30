@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
@@ -28,6 +29,8 @@ from passlib.context import CryptContext
 
 load_dotenv()
 
+logger = logging.getLogger("uvicorn.error")
+
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -47,11 +50,24 @@ JWT_EXPIRA_MINUTOS = 60 * 24 * 7
 
 TZ_LOCAL = ZoneInfo("America/Bogota")
 
+TAMANO_MAXIMO_MB = 5
+TAMANO_MAXIMO_BYTES = int(TAMANO_MAXIMO_MB * 1024 * 1024)
+
 
 def rango_del_dia(dia: date):
     inicio = datetime.combine(dia, time.min, tzinfo=TZ_LOCAL)
     fin = inicio + timedelta(days=1)
     return inicio, fin
+
+
+def detectar_tipo_imagen(datos: bytes) -> str | None:
+    if datos.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if datos.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if datos[:4] == b"RIFF" and datos[8:12] == b"WEBP":
+        return "image/webp"
+    return None
 
 
 genai_client = genai.Client(
@@ -67,8 +83,6 @@ Si la imagen no muestra comida ni bebida (por ejemplo una persona, un objeto o u
 responde con contiene_comida en false, alimentos como lista vacía y calorias_totales en 0.
 No inventes alimentos.
 """
-
-
 
 
 async def generar_con_reintentos(contents, config, intentos=3):
@@ -155,18 +169,55 @@ async def analizar_foto(
     foto: UploadFile = File(...),
     usuario: dict = Depends(get_usuario_actual),
 ):
-    imagen_bytes = await foto.read()
+    imagen_bytes = await foto.read(TAMANO_MAXIMO_BYTES + 1)
+
+    if len(imagen_bytes) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="El archivo está vacío, selecciona una foto",
+        )
+
+    tipo_imagen = detectar_tipo_imagen(imagen_bytes)
+    if tipo_imagen is None:
+        raise HTTPException(
+            status_code=415,
+            detail="El archivo no es una imagen válida, usa una foto JPG, PNG o WebP",
+        )
+
+    if len(imagen_bytes) > TAMANO_MAXIMO_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"La imagen es demasiado grande, el máximo es {TAMANO_MAXIMO_MB} MB",
+        )
 
     try:
         respuesta = await generar_con_reintentos(
             contents=[
-                types.Part.from_bytes(data=imagen_bytes, mime_type=foto.content_type),
+                types.Part.from_bytes(data=imagen_bytes, mime_type=tipo_imagen),
                 PROMPT_ANALISIS,
             ],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 response_schema=AnalisisFoto,
             ),
+        )
+    except genai_errors.ClientError as e:
+        codigo = getattr(e, "code", None)
+        if codigo == 429:
+            raise HTTPException(
+                status_code=429,
+                detail="Se superó el límite de uso del servicio de análisis, intenta de nuevo más tarde",
+                headers={"Retry-After": "60"},
+            )
+        if codigo == 400 and "api key" not in str(e).lower():
+            raise HTTPException(
+                status_code=422,
+                detail="No se pudo procesar la imagen, intenta con otra foto",
+            )
+        logger.error("Error de Gemini (%s): %s", codigo, e)
+        raise HTTPException(
+            status_code=503,
+            detail="El servicio de análisis no está disponible en este momento",
         )
     except genai_errors.ServerError:
         raise HTTPException(
@@ -179,7 +230,14 @@ async def analizar_foto(
             detail="El servicio de análisis no respondió a tiempo, revisa tu conexión e intenta de nuevo",
         )
 
-    analisis = AnalisisFoto.model_validate_json(respuesta.text)
+    try:
+        analisis = AnalisisFoto.model_validate_json(respuesta.text)
+    except ValueError:
+        logger.error("Respuesta inesperada de Gemini: %r", respuesta.text)
+        raise HTTPException(
+            status_code=502,
+            detail="El servicio de análisis devolvió una respuesta inválida, intenta de nuevo",
+        )
 
     if not analisis.contiene_comida or not analisis.alimentos:
         raise HTTPException(
@@ -261,6 +319,8 @@ async def resumen_hoy(usuario: dict = Depends(get_usuario_actual)):
         calorias_restantes=meta - consumidas,
         cantidad_comidas=cantidad,
     )
+
+
 @app.patch("/usuario/meta")
 async def cambiar_meta_calorias(
     datos: MetaCaloriasActualizar,
