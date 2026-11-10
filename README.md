@@ -129,3 +129,9 @@ Solo deben aparecer `.env.example` y `ccalorias-backend/.env.example`. Si aparec
 | 401 en Swagger                                         | Token pegado con comillas o vencido                                  | Copia solo el texto que empieza en `eyJ`, sin comillas                                               |
 | 503 al analizar una foto                               | Gemini con mucha demanda                                             | Reintenta en un minuto                                                                               |
 | Cambié `.env.local` y no se nota                       | Expo guarda la configuración en caché                                | Reinicia con `npx expo start -c`                                                                     |
+
+## Decisiones de diseño
+
+### Fotos: públicas por enlace no adivinable (ticket #30)
+
+Las fotos de los platos se guardan en Cloudinary con un nombre aleatorio de 32 caracteres. Nadie puede listarlas, pero quien tenga el enlace puede verlas. Motivo: es lo más simple para el MVP y las fotos son de comida. Riesgo aceptado: si un enlace se filtra, la foto es visible, y mientras no exista una función para borrar registros, las fotos no se eliminan. Si el equipo decide fotos privadas, la foto se serviría desde el backend comprobando el token del usuario.
