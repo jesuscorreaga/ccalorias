@@ -117,21 +117,44 @@ Solo deben aparecer `.env.example` y `ccalorias-backend/.env.example`. Si aparec
 
 ## Problemas comunes
 
-| Síntoma                                                | Causa probable                                                       | Solución                                                                                             |
-| ------------------------------------------------------ | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `Network request failed` o `Failed to fetch` en la app | El backend no está encendido, o la URL de `.env.local` es incorrecta | Arranca el backend, revisa `.env.local` y reinicia con `npx expo start -c`                           |
-| Funciona en el navegador pero no en el celular         | `localhost` no es tu PC desde el celular                             | Usa la IP del PC en `.env.local` y arranca el backend con `--host 0.0.0.0`                           |
-| Sigue fallando aunque la IP esté bien                  | Firewall de Windows o una red con aislamiento de clientes            | Permite el puerto 8000 en redes privadas, o conecta el PC al punto de acceso del celular             |
-| `/health/db` falla                                     | La IP del PC no está en Atlas, o el cluster está pausado             | Agrega la IP en Network Access y reanuda el cluster                                                  |
-| `ModuleNotFoundError` al arrancar el backend           | Entorno virtual sin activar o dependencias sin instalar              | Activa el venv y corre `pip install -r requirements.txt`                                             |
-| `Project is incompatible with this version of Expo Go` | La versión de Expo Go no coincide con el SDK del proyecto            | Actualiza el proyecto al SDK que soporte tu Expo Go, o instala la versión de Expo Go que corresponda |
-| `Unable to resolve module` al abrir la app             | `node_modules` incompleto o desactualizado                           | Borra `node_modules`, corre `npm install` y arranca con `npx expo start -c`                          |
-| 401 en Swagger                                         | Token pegado con comillas o vencido                                  | Copia solo el texto que empieza en `eyJ`, sin comillas                                               |
-| 503 al analizar una foto                               | Gemini con mucha demanda                                             | Reintenta en un minuto                                                                               |
-| Cambié `.env.local` y no se nota                       | Expo guarda la configuración en caché                                | Reinicia con `npx expo start -c`                                                                     |
+| Síntoma                                                      | Causa probable                                                       | Solución                                                                                             |
+| ------------------------------------------------------------ | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `Network request failed` o `Failed to fetch` en la app       | El backend no está encendido, o la URL de `.env.local` es incorrecta | Arranca el backend, revisa `.env.local` y reinicia con `npx expo start -c`                           |
+| Funciona en el navegador pero no en el celular               | `localhost` no es tu PC desde el celular                             | Usa la IP del PC en `.env.local` y arranca el backend con `--host 0.0.0.0`                           |
+| Sigue fallando aunque la IP esté bien                        | Firewall de Windows o una red con aislamiento de clientes            | Permite el puerto 8000 en redes privadas, o conecta el PC al punto de acceso del celular             |
+| `/health/db` falla                                           | La IP del PC no está en Atlas, o el cluster está pausado             | Agrega la IP en Network Access y reanuda el cluster                                                  |
+| `ModuleNotFoundError` al arrancar el backend                 | Entorno virtual sin activar o dependencias sin instalar              | Activa el venv y corre `pip install -r requirements.txt`                                             |
+| `Project is incompatible with this version of Expo Go`       | La versión de Expo Go no coincide con el SDK del proyecto            | Actualiza el proyecto al SDK que soporte tu Expo Go, o instala la versión de Expo Go que corresponda |
+| `Unable to resolve module` al abrir la app                   | `node_modules` incompleto o desactualizado                           | Borra `node_modules`, corre `npm install` y arranca con `npx expo start -c`                          |
+| 401 en Swagger                                               | Token pegado con comillas o vencido                                  | Copia solo el texto que empieza en `eyJ`, sin comillas                                               |
+| 503 al analizar una foto                                     | Gemini con mucha demanda                                             | Reintenta en un minuto                                                                               |
+| Cambié `.env.local` y no se nota                             | Expo guarda la configuración en caché                                | Reinicia con `npx expo start -c`                                                                     |
+| `Failed to fetch` en la web aunque el backend esté encendido | El origen de la web no está en `CORS_ORIGINS`                        | Agrégalo en `.env` y reinicia el backend (el log muestra los orígenes activos)                       |
 
 ## Decisiones de diseño
 
 ### Fotos: públicas por enlace no adivinable (ticket #30)
 
 Las fotos de los platos se guardan en Cloudinary con un nombre aleatorio de 32 caracteres. Nadie puede listarlas, pero quien tenga el enlace puede verlas. Motivo: es lo más simple para el MVP y las fotos son de comida. Riesgo aceptado: si un enlace se filtra, la foto es visible, y mientras no exista una función para borrar registros, las fotos no se eliminan. Si el equipo decide fotos privadas, la foto se serviría desde el backend comprobando el token del usuario.
+
+## Variables de entorno
+
+Backend (`ccalorias-backend/.env`, plantilla en `.env.example`):
+
+| Variable                                                               | Para qué sirve                                                                                                               |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `MONGO_URI`                                                            | Connection string de MongoDB Atlas                                                                                           |
+| `JWT_SECRET`                                                           | Clave para firmar los tokens                                                                                                 |
+| `GEMINI_API_KEY`                                                       | API key de Gemini                                                                                                            |
+| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Almacenamiento de las fotos                                                                                                  |
+| `CORS_ORIGINS`                                                         | Orígenes que pueden llamar al backend desde el navegador, separados por comas. Opcional: por defecto `http://localhost:8081` |
+
+App (`.env.local` en la raíz, plantilla en `.env.example`):
+
+| Variable              | Para qué sirve                                                                                           |
+| --------------------- | -------------------------------------------------------------------------------------------------------- |
+| `EXPO_PUBLIC_API_URL` | URL del backend. Cambiar de PC solo requiere cambiar este valor y reiniciar Expo con `npx expo start -c` |
+
+`CORS_ORIGINS` solo afecta a la versión web de la app. Si abres la web desde otra dirección (por ejemplo `http://127.0.0.1:8081` o la IP del PC), agrégala separada por comas y reinicia el backend:
+
+CORS_ORIGINS=http://localhost:8081,http://192.168.1.11:8081
