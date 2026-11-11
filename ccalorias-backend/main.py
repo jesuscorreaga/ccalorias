@@ -32,10 +32,22 @@ load_dotenv()
 
 logger = logging.getLogger("uvicorn.error")
 
+CORS_ORIGENES_POR_DEFECTO = ["http://localhost:8081"]
+
+
+def leer_origenes_cors() -> list[str]:
+    valor = os.getenv("CORS_ORIGINS", "")
+    origenes = [o.strip().rstrip("/") for o in valor.split(",") if o.strip()]
+    return origenes or CORS_ORIGENES_POR_DEFECTO
+
+
+CORS_ORIGENES = leer_origenes_cors()
+logger.info("CORS: orígenes permitidos %s", CORS_ORIGENES)
+
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8081"],
+    allow_origins=CORS_ORIGENES,
     allow_methods=["*"],
     allow_headers=["*"],
 )
