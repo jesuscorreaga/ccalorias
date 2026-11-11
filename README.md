@@ -1,3 +1,39 @@
+### Configuración de variables de entorno
+
+#### Backend
+
+Configura las siguientes variables en el archivo `.env` dentro de `ccalorias-backend`:
+
+- `MONGO_URI`: conexión a MongoDB Atlas.
+- `JWT_SECRET`: clave secreta para firmar los tokens.
+- `GEMINI_API_KEY`: API key de Google Gemini.
+- `CLOUDINARY_CLOUD_NAME`: nombre de la cuenta de Cloudinary.
+- `CLOUDINARY_API_KEY`: API key de Cloudinary.
+- `CLOUDINARY_API_SECRET`: API secret de Cloudinary.
+- `CORS_ORIGINS`: orígenes permitidos por CORS, separados por comas.
+
+Si `CORS_ORIGINS` no está definida o está vacía, se utiliza por defecto:
+
+`http://localhost:8081`
+
+Ejemplo:
+
+`CORS_ORIGINS=http://localhost:8081,https://miapp.com`
+
+#### Frontend
+
+Configura `EXPO_PUBLIC_API_URL` en el archivo `.env` del frontend.
+
+Esta variable define la URL del backend al que se conecta la aplicación.
+
+Ejemplo:
+
+`EXPO_PUBLIC_API_URL=http://localhost:8000`
+
+Si no está definida o está vacía, se utiliza `http://localhost:8000`.
+
+Esto permite cambiar la dirección del backend entre diferentes equipos o entornos sin modificar el código fuente.
+
 # Ccalorias
 
 App móvil que estima las calorías de un plato a partir de una foto. La app (React Native + Expo) envía la imagen a un backend (FastAPI), que la analiza con Gemini y guarda el resultado en MongoDB Atlas.

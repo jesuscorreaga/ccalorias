@@ -2,7 +2,7 @@ import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
 export const API_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
+  process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
 
 const TOKEN_KEY = "token";
 
