@@ -41,6 +41,7 @@ class RegistroRespuesta(BaseModel):
     id: str
     calorias_estimadas: int
     alimentos_detectados: list[AlimentoDetectado]
+    foto_url: str | None = None
     fecha_hora: datetime
 
 
