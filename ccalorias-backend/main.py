@@ -246,6 +246,9 @@ async def analizar_foto(
             detail="No se detectó comida en la foto, intenta con otra imagen",
         )
 
+    # Gemini puede dar un total que no coincide con la lista, así que lo calculamos nosotros
+    analisis.calorias_totales = sum(a.calorias for a in analisis.alimentos)
+
     foto_url = await subir_foto(imagen_bytes)
 
     await db.registros_comida.insert_one(
