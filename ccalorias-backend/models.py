@@ -1,12 +1,20 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+# Largo mínimo de la contraseña al registrarse (si el equipo cambia el valor, se cambia solo aquí)
+PASSWORD_MINIMA = 8
 
 
 class UsuarioRegistro(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=PASSWORD_MINIMA)
     meta_calorias_diaria: int = 2000
+
+    @field_validator("email")
+    @classmethod
+    def email_en_minusculas(cls, valor: str) -> str:
+        return valor.lower()
 
 
 class UsuarioRespuesta(BaseModel):
@@ -18,6 +26,11 @@ class UsuarioRespuesta(BaseModel):
 class UsuarioLogin(BaseModel):
     email: EmailStr
     password: str
+
+    @field_validator("email")
+    @classmethod
+    def email_en_minusculas(cls, valor: str) -> str:
+        return valor.lower()
 
 
 class TokenRespuesta(BaseModel):

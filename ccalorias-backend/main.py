@@ -26,6 +26,7 @@ from models import (
     UsuarioRespuesta,
 )
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.collation import Collation
 from passlib.context import CryptContext
 
 load_dotenv()
@@ -71,6 +72,8 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRA_MINUTOS = 60 * 24 * 7
 
 TZ_LOCAL = ZoneInfo("America/Bogota")
+# Compara emails sin distinguir mayúsculas, para que los usuarios que ya existen con mayúsculas sigan entrando
+COLLATION_EMAIL = Collation(locale="en", strength=2)
 
 TAMANO_MAXIMO_MB = 5
 TAMANO_MAXIMO_BYTES = int(TAMANO_MAXIMO_MB * 1024 * 1024)
@@ -157,7 +160,7 @@ async def check_db():
 
 @app.post("/auth/register", response_model=UsuarioRespuesta)
 async def registrar_usuario(usuario: UsuarioRegistro):
-    existente = await db.usuarios.find_one({"email": usuario.email})
+    existente = await db.usuarios.find_one({"email": usuario.email}, collation=COLLATION_EMAIL)
     if existente:
         raise HTTPException(status_code=400, detail="El email ya está registrado")
 
@@ -178,7 +181,7 @@ async def registrar_usuario(usuario: UsuarioRegistro):
 
 @app.post("/auth/login", response_model=TokenRespuesta)
 async def login_usuario(datos: UsuarioLogin):
-    usuario = await db.usuarios.find_one({"email": datos.email})
+    usuario = await db.usuarios.find_one({"email": datos.email}, collation=COLLATION_EMAIL)
     if not usuario or not pwd_context.verify(datos.password, usuario["password_hash"]):
         raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
 
