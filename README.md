@@ -159,12 +159,14 @@ Backend (`ccalorias-backend/.env`, plantilla en `.env.example`):
 | `GEMINI_API_KEY`                                                       | API key de Gemini                                                                                                            |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Almacenamiento de las fotos                                                                                                  |
 | `CORS_ORIGINS`                                                         | Orígenes que pueden llamar al backend desde el navegador, separados por comas. Opcional: por defecto `http://localhost:8081` |
+| `GOOGLE_CLIENT_ID`                                                     | ID de cliente web de Google Cloud, para el inicio de sesión con Google (HU13). Se pide al equipo, no se sube a Git            |
 
 App (`.env.local` en la raíz, plantilla en `.env.example`):
 
 | Variable              | Para qué sirve                                                                                           |
 | --------------------- | -------------------------------------------------------------------------------------------------------- |
 | `EXPO_PUBLIC_API_URL` | URL del backend. Cambiar de PC solo requiere cambiar este valor y reiniciar Expo con `npx expo start -c` |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | Mismo ID de cliente web de Google, para el botón de inicio de sesión con Google (HU13). Se pide al equipo |
 
 `CORS_ORIGINS` solo afecta a la versión web de la app. Si abres la web desde otra dirección (por ejemplo `http://127.0.0.1:8081` o la IP del PC), agrégala separada por comas y reinicia el backend:
 
