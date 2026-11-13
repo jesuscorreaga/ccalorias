@@ -1,39 +1,3 @@
-### Configuración de variables de entorno
-
-#### Backend
-
-Configura las siguientes variables en el archivo `.env` dentro de `ccalorias-backend`:
-
-- `MONGO_URI`: conexión a MongoDB Atlas.
-- `JWT_SECRET`: clave secreta para firmar los tokens.
-- `GEMINI_API_KEY`: API key de Google Gemini.
-- `CLOUDINARY_CLOUD_NAME`: nombre de la cuenta de Cloudinary.
-- `CLOUDINARY_API_KEY`: API key de Cloudinary.
-- `CLOUDINARY_API_SECRET`: API secret de Cloudinary.
-- `CORS_ORIGINS`: orígenes permitidos por CORS, separados por comas.
-
-Si `CORS_ORIGINS` no está definida o está vacía, se utiliza por defecto:
-
-`http://localhost:8081`
-
-Ejemplo:
-
-`CORS_ORIGINS=http://localhost:8081,https://miapp.com`
-
-#### Frontend
-
-Configura `EXPO_PUBLIC_API_URL` en el archivo `.env` del frontend.
-
-Esta variable define la URL del backend al que se conecta la aplicación.
-
-Ejemplo:
-
-`EXPO_PUBLIC_API_URL=http://localhost:8000`
-
-Si no está definida o está vacía, se utiliza `http://localhost:8000`.
-
-Esto permite cambiar la dirección del backend entre diferentes equipos o entornos sin modificar el código fuente.
-
 # Ccalorias
 
 App móvil que estima las calorías de un plato a partir de una foto. La app (React Native + Expo) envía la imagen a un backend (FastAPI), que la analiza con Gemini y guarda el resultado en MongoDB Atlas.
@@ -48,6 +12,7 @@ ccalorias/                  raíz del repo y app móvil (Expo)
   ccalorias-backend/        API (FastAPI)
     main.py
     models.py
+    almacenamiento.py       subida de las fotos a Cloudinary
     requirements.txt
     .env.example            plantilla de credenciales
     .env                    tus credenciales reales (no se sube a Git)
@@ -58,13 +23,14 @@ Los archivos `.env.example` sí están en Git y no tienen valores reales. Cada p
 ## Requisitos
 
 - Git
-- Node.js 18 o superior (versión LTS)
-- Python 3.12
-- Expo Go instalado en el celular
+- Node.js, versión LTS actual. Con Node 20.11 Expo no arranca (falla al leer `.env.local`).
+- Python 3.12 (también probado con 3.14)
+- Expo Go instalado en el celular. Debe ser de la misma versión de SDK que el proyecto (hoy SDK 58); si no coincide, la app no abre.
 - Un cluster de MongoDB Atlas (el gratuito M0 sirve)
 - Una API key de Gemini, que se crea en aistudio.google.com
+- Una cuenta gratuita de Cloudinary (cloudinary.com). Es opcional: sin ella la app funciona, pero las fotos no se guardan.
 
-Para probar en el celular, el PC y el celular deben estar en la misma red Wi-Fi.
+Para probar en el celular, el PC y el celular deben estar en la misma red Wi-Fi y la VPN debe estar apagada.
 
 ## 1. Clonar el repositorio
 
@@ -94,8 +60,9 @@ Abre `.env` y reemplaza los valores de ejemplo:
 - `MONGO_URI`: el connection string de Atlas (Connect, Drivers).
 - `JWT_SECRET`: una clave aleatoria. Puedes generarla con `python -c "import secrets; print(secrets.token_hex(32))"`.
 - `GEMINI_API_KEY`: tu key de AI Studio.
+- `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` y `CLOUDINARY_API_SECRET` (opcionales): en la consola de Cloudinary, sección API Keys. Sin ellas, las fotos no se guardan y `foto_url` queda vacío.
 
-En MongoDB Atlas, entra a Network Access y agrega la IP de tu PC (o `0.0.0.0/0` solo mientras desarrollas). Sin esto, la conexión a Mongo falla desde un PC nuevo.
+En MongoDB Atlas, entra a Network Access y agrega la IP de tu PC (o `0.0.0.0/0` solo mientras desarrollas). Sin esto, la conexión a Mongo falla desde un PC nuevo. Si cambias de red, la IP cambia y hay que agregarla otra vez.
 
 Arranca el servidor:
 
@@ -105,9 +72,11 @@ python -m uvicorn main:app --reload --host 0.0.0.0
 
 Comprueba que conecta abriendo `http://localhost:8000/health/db`. Debe responder `{"mongo": "conectado"}`. La documentación de la API está en `http://localhost:8000/docs`.
 
+Si cambias el `.env`, reinicia el backend: `--reload` solo vigila los archivos `.py`.
+
 ## 3. App móvil
 
-Abre una segunda terminal en la raíz del repo (`ccalorias`):
+Abre una segunda terminal en la raíz del repo (`ccalorias`), sin el entorno virtual de Python activo:
 
 ```
 npm install
@@ -125,6 +94,8 @@ Abre `.env.local` y deja en `EXPO_PUBLIC_API_URL` la dirección del backend seg�
 
 La IP de tu PC se obtiene con `ipconfig` (campo "Dirección IPv4" del adaptador Wi-Fi; en Mac o Linux, `ifconfig`). Para el celular, el backend debe estar arrancado con `--host 0.0.0.0`.
 
+Para comprobar que el celular llega al backend, antes de abrir la app, abre en el navegador del celular `http://IP_DE_TU_PC:8000/`. Debe mostrar `{"status":"ok"}`.
+
 Arranca Expo:
 
 ```
@@ -136,8 +107,9 @@ Escanea el código QR con Expo Go, o pulsa `w` para abrirla en el navegador.
 ## 4. Primer uso
 
 1. La app abre la pantalla de login.
-2. Toca "Regístrate" y crea una cuenta.
-3. Entra a la cámara, toma una foto de un plato y revisa la estimación.
+2. Toca "Regístrate" y crea una cuenta (la contraseña necesita al menos 8 caracteres cuando se apruebe la tarjeta TT08).
+3. Si aparecen preguntas iniciales, respóndelas.
+4. Entra a la cámara, toma una foto de un plato y revisa la estimación.
 
 Para probar solo el backend, sin la app, abre `http://localhost:8000/docs`, haz login en `/auth/login`, pega el token (sin comillas) en el botón Authorize y prueba los endpoints.
 
@@ -156,10 +128,13 @@ Solo deben aparecer `.env.example` y `ccalorias-backend/.env.example`. Si aparec
 | Síntoma                                                      | Causa probable                                                       | Solución                                                                                             |
 | ------------------------------------------------------------ | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `Network request failed` o `Failed to fetch` en la app       | El backend no está encendido, o la URL de `.env.local` es incorrecta | Arranca el backend, revisa `.env.local` y reinicia con `npx expo start -c`                           |
+| "No se pudo conectar con el servidor" en el celular          | La IP del PC cambió, o hay una VPN encendida                         | Apaga la VPN, vuelve a mirar la IP con `ipconfig`, actualiza `.env.local` y reinicia con `npx expo start -c` |
 | Funciona en el navegador pero no en el celular               | `localhost` no es tu PC desde el celular                             | Usa la IP del PC en `.env.local` y arranca el backend con `--host 0.0.0.0`                           |
 | Sigue fallando aunque la IP esté bien                        | Firewall de Windows o una red con aislamiento de clientes            | Permite el puerto 8000 en redes privadas, o conecta el PC al punto de acceso del celular             |
 | `/health/db` falla                                           | La IP del PC no está en Atlas, o el cluster está pausado             | Agrega la IP en Network Access y reanuda el cluster                                                  |
 | `ModuleNotFoundError` al arrancar el backend                 | Entorno virtual sin activar o dependencias sin instalar              | Activa el venv y corre `pip install -r requirements.txt`                                             |
+| `parseEnv is not a function` al arrancar Expo                | Node demasiado viejo (por ejemplo 20.11)                             | Instala la versión LTS de nodejs.org, abre una terminal nueva y comprueba con `node -v`              |
+| `You're signed in to Expo Go as ... but not signed in to Expo CLI` | Expo exige la misma sesión en Expo Go y en la terminal         | Cierra sesión en Expo Go (perfil, Log out), o crea un token en expo.dev (Settings, Access tokens) y úsalo solo en esa terminal con `$env:EXPO_TOKEN="..."`. No subas el token a Git |
 | `Project is incompatible with this version of Expo Go`       | La versión de Expo Go no coincide con el SDK del proyecto            | Actualiza el proyecto al SDK que soporte tu Expo Go, o instala la versión de Expo Go que corresponda |
 | `Unable to resolve module` al abrir la app                   | `node_modules` incompleto o desactualizado                           | Borra `node_modules`, corre `npm install` y arranca con `npx expo start -c`                          |
 | 401 en Swagger                                               | Token pegado con comillas o vencido                                  | Copia solo el texto que empieza en `eyJ`, sin comillas                                               |
@@ -193,4 +168,6 @@ App (`.env.local` en la raíz, plantilla en `.env.example`):
 
 `CORS_ORIGINS` solo afecta a la versión web de la app. Si abres la web desde otra dirección (por ejemplo `http://127.0.0.1:8081` o la IP del PC), agrégala separada por comas y reinicia el backend:
 
+```
 CORS_ORIGINS=http://localhost:8081,http://192.168.1.11:8081
+```
