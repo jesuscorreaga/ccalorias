@@ -5,6 +5,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 import httpx
+from almacenamiento import subir_foto
 from bson import ObjectId
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
@@ -245,10 +246,12 @@ async def analizar_foto(
             detail="No se detectó comida en la foto, intenta con otra imagen",
         )
 
+    foto_url = await subir_foto(imagen_bytes)
+
     await db.registros_comida.insert_one(
         {
             "usuario_id": usuario["_id"],
-            "foto_url": None,
+            "foto_url": foto_url,
             "calorias_estimadas": analisis.calorias_totales,
             "alimentos_detectados": [a.model_dump() for a in analisis.alimentos],
             "fecha_hora": datetime.now(UTC),
@@ -280,6 +283,7 @@ async def listar_registros(
                 id=str(r["_id"]),
                 calorias_estimadas=r["calorias_estimadas"],
                 alimentos_detectados=r["alimentos_detectados"],
+                foto_url=r.get("foto_url"),
                 fecha_hora=r["fecha_hora"].replace(tzinfo=UTC),
             )
         )

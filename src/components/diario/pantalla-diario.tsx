@@ -12,6 +12,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BarraMacro } from "@/components/diario/barra-macro";
+import { SelectorFecha } from "@/components/diario/selector-fecha";
 import { SelectorVista } from "@/components/diario/selector-vista";
 import { TarjetaComida } from "@/components/diario/tarjeta-comida";
 import { TarjetaRegistro } from "@/components/diario/tarjeta-registro";
@@ -50,7 +51,7 @@ type Props = {
 type VistaLista = "comidas" | "recientes";
 
 /**
- * Historial de comidas del día.
+ * Historial de comidas (pestaña Historial).
  * Barra superior con avatar y fecha, resumen del día (medidor + macros),
  * la lista de comidas (por tipo de comida o de la más reciente a la más
  * antigua), tracker de agua y botón para agregar comida.
@@ -71,9 +72,11 @@ export function PantallaDiario({
   const [reintento, setReintento] = useState(0);
   const [menu, setMenu] = useState(false);
   const [vistaLista, setVistaLista] = useState<VistaLista>("comidas");
+  const [calendario, setCalendario] = useState(false);
 
   const hoy = inicioDelDia(new Date());
   const esHoy = mismoDia(dia, hoy);
+  const esFuturo = dia.getTime() > hoy.getTime();
 
   const primeraVez = useRef(true);
   const refrescoSilencioso = useRef(false);
@@ -137,8 +140,11 @@ export function PantallaDiario({
       style={[styles.raiz, { backgroundColor: theme.background }]}>
       <View style={styles.columna}>
         <ScrollView contentContainerStyle={styles.contenido}>
-          {/* ---------- Barra superior: avatar + fecha con flechas ---------- */}
-          <View style={styles.topBar}>
+          {/* ---------- Encabezado: título + avatar ---------- */}
+          <View style={styles.encabezado}>
+            <ThemedText type="subtitle" style={styles.titulo}>
+              Historial
+            </ThemedText>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Menú de perfil"
@@ -149,40 +155,36 @@ export function PantallaDiario({
               ]}>
               <Text style={styles.avatarEmoji}>🙂</Text>
             </Pressable>
+          </View>
 
-            <View style={styles.fecha}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Día anterior"
-                hitSlop={12}
-                onPress={() => setDia((d) => sumarDias(d, -1))}>
-                <Text style={[styles.flecha, { color: theme.text }]}>‹</Text>
-              </Pressable>
+          {/* ---------- Fecha con flechas ---------- */}
+          <View style={styles.fecha}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Día anterior"
+              hitSlop={12}
+              onPress={() => setDia((d) => sumarDias(d, -1))}>
+              <Text style={[styles.flecha, { color: theme.text }]}>‹</Text>
+            </Pressable>
 
-              <View style={styles.fechaTextos}>
-                <ThemedText style={styles.fechaTitulo}>{etiquetaDia(dia, hoy)}</ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {fechaCorta(dia)}
-                </ThemedText>
-              </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Elegir fecha"
+              onPress={() => setCalendario(true)}
+              style={styles.fechaTextos}>
+              <ThemedText style={styles.fechaTitulo}>{etiquetaDia(dia, hoy)}</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {`📅 ${fechaCorta(dia)}`}
+              </ThemedText>
+            </Pressable>
 
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Día siguiente"
-                disabled={esHoy}
-                hitSlop={12}
-                onPress={() => setDia((d) => sumarDias(d, 1))}>
-                <Text
-                  style={[
-                    styles.flecha,
-                    { color: theme.text, opacity: esHoy ? 0.25 : 1 },
-                  ]}>
-                  ›
-                </Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.espaciador} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Día siguiente"
+              hitSlop={12}
+              onPress={() => setDia((d) => sumarDias(d, 1))}>
+              <Text style={[styles.flecha, { color: theme.text }]}>›</Text>
+            </Pressable>
           </View>
 
           {menu ? (
@@ -207,7 +209,7 @@ export function PantallaDiario({
                 { backgroundColor: theme.backgroundElement, borderColor: theme.danger },
               ]}>
               <Text style={styles.mensajeEmoji}>⚠️</Text>
-              <ThemedText style={styles.mensajeTitulo}>No pudimos cargar tu diario</ThemedText>
+              <ThemedText style={styles.mensajeTitulo}>No pudimos cargar tu historial</ThemedText>
               <ThemedText themeColor="textSecondary" style={styles.textoCentrado}>
                 {error}
               </ThemedText>
@@ -282,13 +284,17 @@ export function PantallaDiario({
                   <ThemedText style={styles.mensajeTitulo}>
                     {esHoy
                       ? "Aún no has registrado comidas hoy"
-                      : "No registraste comidas este día"}
+                      : esFuturo
+                        ? "Este día todavía no llega"
+                        : "No registraste comidas este día"}
                   </ThemedText>
-                  {esHoy ? (
-                    <ThemedText themeColor="textSecondary" style={styles.textoCentrado}>
-                      Toma una foto de tu plato y aparecerá aquí.
-                    </ThemedText>
-                  ) : null}
+                  <ThemedText themeColor="textSecondary" style={styles.textoCentrado}>
+                    {esHoy
+                      ? "Toma una foto de tu plato y aparecerá aquí."
+                      : esFuturo
+                        ? "Aquí no hay comidas porque la fecha aún no ha pasado."
+                        : "No hay comidas guardadas en esta fecha."}
+                  </ThemedText>
                 </View>
               ) : (
                 <>
@@ -342,6 +348,16 @@ export function PantallaDiario({
           )}
         </View>
       </View>
+
+      <SelectorFecha
+        visible={calendario}
+        fecha={dia}
+        onElegir={(d) => {
+          setDia(inicioDelDia(d));
+          setCalendario(false);
+        }}
+        onCerrar={() => setCalendario(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -362,10 +378,15 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     gap: 16,
   },
-  topBar: {
+  encabezado: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  titulo: {
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: "800",
   },
   avatar: {
     width: 44,
@@ -378,12 +399,10 @@ const styles = StyleSheet.create({
   avatarEmoji: {
     fontSize: 22,
   },
-  espaciador: {
-    width: 44,
-  },
   fecha: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 16,
   },
   fechaTextos: {

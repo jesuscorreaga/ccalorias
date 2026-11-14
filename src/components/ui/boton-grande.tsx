@@ -16,6 +16,8 @@ type Props = {
   variante?: 'primario' | 'secundario';
   deshabilitado?: boolean;
   cargando?: boolean;
+  /** Versión más pequeña, para botones que comparten fila. */
+  compacto?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -29,6 +31,7 @@ export function BotonGrande({
   variante = 'primario',
   deshabilitado = false,
   cargando = false,
+  compacto = false,
   style,
 }: Props) {
   const theme = useTheme();
@@ -49,13 +52,14 @@ export function BotonGrande({
       style={({ pressed }) => [
         styles.base,
         { backgroundColor: colores.fondo, borderBottomColor: colores.borde },
+        compacto && styles.compactoBase,
         pressed && !inactivo ? styles.presionado : styles.normal,
         style,
       ]}>
       {cargando ? (
         <ActivityIndicator color={colores.texto} />
       ) : (
-        <Text style={[styles.texto, { color: colores.texto }]}>{titulo}</Text>
+        <Text style={[styles.texto, compacto && styles.compactoTexto, { color: colores.texto }]}>{titulo}</Text>
       )}
     </Pressable>
   );
@@ -77,6 +81,13 @@ const styles = StyleSheet.create({
   presionado: {
     borderBottomWidth: 1,
     marginTop: 3,
+  },
+  compactoBase: {
+    paddingHorizontal: 12,
+  },
+  compactoTexto: {
+    fontSize: 14,
+    letterSpacing: 0.3,
   },
   texto: {
     fontSize: 16,
