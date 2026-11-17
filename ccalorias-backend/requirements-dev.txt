@@ -1,0 +1,4 @@
+# Herramientas de prueba (se instalan además de requirements.txt)
+pytest==9.1.1
+pytest-cov==7.1.0
+pytest-asyncio==1.5.0
