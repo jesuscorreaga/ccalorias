@@ -34,25 +34,19 @@ load_dotenv()
 
 logger = logging.getLogger("uvicorn.error")
 
-
 # Configuración de CORS
 CORS_ORIGENES_POR_DEFECTO = ["http://localhost:8081"]
 
 
 def leer_origenes_cors() -> list[str]:
     valor = os.getenv("CORS_ORIGINS", "")
-
-    origenes = [
-        origen.strip().rstrip("/") for origen in valor.split(",") if origen.strip()
-    ]
-
+    origenes = [origen.strip().rstrip("/") for origen in valor.split(",") if origen.strip()]
     return origenes or CORS_ORIGENES_POR_DEFECTO
 
 
 CORS_ORIGENES = leer_origenes_cors()
 
 logger.info("CORS: orígenes permitidos %s", CORS_ORIGENES)
-
 
 app = FastAPI()
 
@@ -73,7 +67,9 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRA_MINUTOS = 60 * 24 * 7
 
 TZ_LOCAL = ZoneInfo("America/Bogota")
-# Compara emails sin distinguir mayúsculas, para que los usuarios que ya existen con mayúsculas sigan entrando
+
+# Compara emails sin distinguir mayúsculas,
+# para que los usuarios que ya existen con mayúsculas sigan entrando.
 COLLATION_EMAIL = Collation(locale="en", strength=2)
 
 TAMANO_MAXIMO_MB = 5
@@ -122,7 +118,7 @@ async def generar_con_reintentos(contents, config, intentos=3):
         except genai_errors.ServerError:
             if intento == intentos - 1:
                 raise
-            await asyncio.sleep(2 * (intento + 1))
+            await asyncio.sleep(2 ** (intento + 1))
 
 
 def crear_token(usuario_id: str) -> str:
@@ -136,11 +132,16 @@ async def get_usuario_actual(
 ):
     try:
         payload = jwt.decode(
-            credenciales.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM]
+            credenciales.credentials,
+            JWT_SECRET,
+            algorithms=[JWT_ALGORITHM],
         )
         usuario_id = payload.get("sub")
     except JWTError:
-        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+        raise HTTPException(
+            status_code=401,
+            detail="Token inválido o expirado",
+        ) from None
 
     usuario = await db.usuarios.find_one({"_id": ObjectId(usuario_id)})
     if not usuario:
@@ -161,7 +162,10 @@ async def check_db():
 
 @app.post("/auth/register", response_model=UsuarioRespuesta)
 async def registrar_usuario(usuario: UsuarioRegistro):
-    existente = await db.usuarios.find_one({"email": usuario.email}, collation=COLLATION_EMAIL)
+    existente = await db.usuarios.find_one(
+        {"email": usuario.email},
+        collation=COLLATION_EMAIL,
+    )
     if existente:
         raise HTTPException(status_code=400, detail="El email ya está registrado")
 
@@ -182,7 +186,10 @@ async def registrar_usuario(usuario: UsuarioRegistro):
 
 @app.post("/auth/login", response_model=TokenRespuesta)
 async def login_usuario(datos: UsuarioLogin):
-    usuario = await db.usuarios.find_one({"email": datos.email}, collation=COLLATION_EMAIL)
+    usuario = await db.usuarios.find_one(
+        {"email": datos.email},
+        collation=COLLATION_EMAIL,
+    )
     if not usuario or not pwd_context.verify(datos.password, usuario["password_hash"]):
         raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
 
@@ -232,29 +239,39 @@ async def analizar_foto(
         if codigo == 429:
             raise HTTPException(
                 status_code=429,
-                detail="Se superó el límite de uso del servicio de análisis, intenta de nuevo más tarde",
+                detail=(
+                    "Se superó el límite de uso del servicio de análisis, "
+                    "intenta de nuevo más tarde"
+                ),
                 headers={"Retry-After": "60"},
-            )
+            ) from None
+
         if codigo == 400 and "api key" not in str(e).lower():
             raise HTTPException(
                 status_code=422,
                 detail="No se pudo procesar la imagen, intenta con otra foto",
-            )
+            ) from None
+
         logger.error("Error de Gemini (%s): %s", codigo, e)
         raise HTTPException(
             status_code=503,
             detail="El servicio de análisis no está disponible en este momento",
-        )
+        ) from None
+
     except genai_errors.ServerError:
         raise HTTPException(
             status_code=503,
             detail="El servicio de análisis está saturado, intenta de nuevo en un momento",
-        )
+        ) from None
+
     except httpx.TransportError:
         raise HTTPException(
             status_code=504,
-            detail="El servicio de análisis no respondió a tiempo, revisa tu conexión e intenta de nuevo",
-        )
+            detail=(
+                "El servicio de análisis no respondió a tiempo, "
+                "revisa tu conexión e intenta de nuevo"
+            ),
+        ) from None
 
     try:
         analisis = AnalisisFoto.model_validate_json(respuesta.text)
@@ -263,7 +280,7 @@ async def analizar_foto(
         raise HTTPException(
             status_code=502,
             detail="El servicio de análisis devolvió una respuesta inválida, intenta de nuevo",
-        )
+        ) from None
 
     if not analisis.contiene_comida or not analisis.alimentos:
         raise HTTPException(
@@ -271,7 +288,7 @@ async def analizar_foto(
             detail="No se detectó comida en la foto, intenta con otra imagen",
         )
 
-    # Gemini puede dar un total que no coincide con la lista, así que lo calculamos nosotros
+    # Gemini puede dar un total que no coincide con la lista, así que lo calculamos nosotros.
     analisis.calorias_totales = sum(a.calorias for a in analisis.alimentos)
 
     foto_url = await subir_foto(imagen_bytes)
