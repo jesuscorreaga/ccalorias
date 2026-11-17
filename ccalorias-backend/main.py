@@ -5,7 +5,6 @@ from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 import httpx
-from almacenamiento import subir_foto
 from bson import ObjectId
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
@@ -15,6 +14,11 @@ from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
 from jose import JWTError, jwt
+from motor.motor_asyncio import AsyncIOMotorClient
+from passlib.context import CryptContext
+from pymongo.collation import Collation
+
+from almacenamiento import subir_foto
 from models import (
     AnalisisFoto,
     MetaCaloriasActualizar,
@@ -25,9 +29,6 @@ from models import (
     UsuarioRegistro,
     UsuarioRespuesta,
 )
-from motor.motor_asyncio import AsyncIOMotorClient
-from pymongo.collation import Collation
-from passlib.context import CryptContext
 
 load_dotenv()
 
