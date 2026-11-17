@@ -4,6 +4,8 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 
 # Largo mínimo de la contraseña al registrarse (si el equipo cambia el valor, se cambia solo aquí)
 PASSWORD_MINIMA = 8
+# bcrypt solo usa los primeros 72 bytes de la contraseña, así que más largo se rechaza
+PASSWORD_MAXIMA_BYTES = 72
 
 
 class UsuarioRegistro(BaseModel):
@@ -15,6 +17,14 @@ class UsuarioRegistro(BaseModel):
     @classmethod
     def email_en_minusculas(cls, valor: str) -> str:
         return valor.lower()
+
+    @field_validator("password")
+    @classmethod
+    def password_maximo_72_bytes(cls, valor: str) -> str:
+        # Se cuentan bytes y no caracteres: una «ñ» ocupa 2 bytes
+        if len(valor.encode("utf-8")) > PASSWORD_MAXIMA_BYTES:
+            raise ValueError(f"La contraseña no puede pasar de {PASSWORD_MAXIMA_BYTES} bytes")
+        return valor
 
 
 class UsuarioRespuesta(BaseModel):
