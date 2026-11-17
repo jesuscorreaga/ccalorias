@@ -50,3 +50,7 @@ ccalorias-backend/venv/
 ccalorias-backend/__pycache__/
 ccalorias-backend/.env
 node_modules/
+# Pruebas y cobertura (Python)
+.venv/
+.pytest_cache/
+.coverage
