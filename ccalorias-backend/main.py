@@ -11,6 +11,9 @@ from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from google import genai
+from google.auth import exceptions as google_exceptions
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 from google.genai import errors as genai_errors
 from google.genai import types
 from jose import JWTError, jwt
@@ -21,6 +24,7 @@ from pymongo.collation import Collation
 from almacenamiento import subir_foto
 from models import (
     AnalisisFoto,
+    GoogleLogin,
     MetaCaloriasActualizar,
     RegistroRespuesta,
     ResumenDiario,
@@ -65,6 +69,14 @@ bearer_scheme = HTTPBearer()
 JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRA_MINUTOS = 60 * 24 * 7
+
+# Se aceptan varios clientes OAuth (por ejemplo, Android y web).
+# GOOGLE_CLIENT_ID se mantiene como alternativa para instalaciones anteriores.
+GOOGLE_CLIENT_IDS = [
+    cliente.strip()
+    for cliente in os.getenv("GOOGLE_CLIENT_IDS", os.getenv("GOOGLE_CLIENT_ID", "")).split(",")
+    if cliente.strip()
+]
 
 TZ_LOCAL = ZoneInfo("America/Bogota")
 
@@ -119,6 +131,15 @@ async def generar_con_reintentos(contents, config, intentos=3):
             if intento == intentos - 1:
                 raise
             await asyncio.sleep(2 ** (intento + 1))
+
+
+def verificar_token_google(token: str) -> dict:
+    """Verifica firma, emisor, expiración y audiencia del ID token de Google."""
+    return google_id_token.verify_oauth2_token(
+        token,
+        google_requests.Request(),
+        audience=GOOGLE_CLIENT_IDS,
+    )
 
 
 def crear_token(usuario_id: str) -> str:
@@ -190,11 +211,57 @@ async def login_usuario(datos: UsuarioLogin):
         {"email": datos.email},
         collation=COLLATION_EMAIL,
     )
-    if not usuario or not pwd_context.verify(datos.password, usuario["password_hash"]):
+    password_hash = usuario.get("password_hash") if usuario else None
+    if not usuario or not password_hash or not pwd_context.verify(datos.password, password_hash):
         raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
 
     token = crear_token(str(usuario["_id"]))
     return TokenRespuesta(access_token=token)
+
+
+@app.post("/auth/google", response_model=TokenRespuesta)
+async def login_google(datos: GoogleLogin):
+    if not GOOGLE_CLIENT_IDS:
+        raise HTTPException(
+            status_code=503,
+            detail="El inicio de sesión con Google no está configurado",
+        )
+
+    try:
+        info = verificar_token_google(datos.id_token)
+    except google_exceptions.TransportError:
+        raise HTTPException(
+            status_code=503,
+            detail="No fue posible verificar el token con Google",
+        ) from None
+    except (ValueError, google_exceptions.GoogleAuthError):
+        raise HTTPException(status_code=401, detail="Token de Google inválido") from None
+
+    email = info.get("email")
+    if not email or not info.get("email_verified"):
+        raise HTTPException(
+            status_code=401,
+            detail="Google no ha verificado el correo de esta cuenta",
+        )
+
+    email = email.strip().lower()
+    usuario = await db.usuarios.find_one(
+        {"email": email},
+        collation=COLLATION_EMAIL,
+    )
+
+    if usuario is None:
+        nuevo_usuario = {
+            "email": email,
+            "password_hash": None,
+            "meta_calorias_diaria": 2000,
+        }
+        resultado = await db.usuarios.insert_one(nuevo_usuario)
+        usuario_id = resultado.inserted_id
+    else:
+        usuario_id = usuario["_id"]
+
+    return TokenRespuesta(access_token=crear_token(str(usuario_id)))
 
 
 @app.post("/analisis/foto", response_model=AnalisisFoto)
