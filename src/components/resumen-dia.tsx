@@ -1,4 +1,4 @@
-import { Platform, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
   contenedor: {
     paddingHorizontal: 16,
     paddingBottom: 12,
-    paddingTop: Platform.OS === "web" ? 72 : 12,
+    paddingTop: 12,
   },
   tarjeta: {
     flexDirection: "row",

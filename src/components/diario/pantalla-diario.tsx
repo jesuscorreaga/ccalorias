@@ -50,7 +50,7 @@ type Props = {
 type VistaLista = "comidas" | "recientes";
 
 /**
- * Historial de comidas del día.
+ * Historial de comidas (pestaña Historial).
  * Barra superior con avatar y fecha, resumen del día (medidor + macros),
  * la lista de comidas (por tipo de comida o de la más reciente a la más
  * antigua), tracker de agua y botón para agregar comida.
@@ -137,8 +137,11 @@ export function PantallaDiario({
       style={[styles.raiz, { backgroundColor: theme.background }]}>
       <View style={styles.columna}>
         <ScrollView contentContainerStyle={styles.contenido}>
-          {/* ---------- Barra superior: avatar + fecha con flechas ---------- */}
-          <View style={styles.topBar}>
+          {/* ---------- Encabezado: título + avatar ---------- */}
+          <View style={styles.encabezado}>
+            <ThemedText type="subtitle" style={styles.titulo}>
+              Historial
+            </ThemedText>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Menú de perfil"
@@ -149,40 +152,39 @@ export function PantallaDiario({
               ]}>
               <Text style={styles.avatarEmoji}>🙂</Text>
             </Pressable>
+          </View>
 
-            <View style={styles.fecha}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Día anterior"
-                hitSlop={12}
-                onPress={() => setDia((d) => sumarDias(d, -1))}>
-                <Text style={[styles.flecha, { color: theme.text }]}>‹</Text>
-              </Pressable>
+          {/* ---------- Fecha con flechas ---------- */}
+          <View style={styles.fecha}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Día anterior"
+              hitSlop={12}
+              onPress={() => setDia((d) => sumarDias(d, -1))}>
+              <Text style={[styles.flecha, { color: theme.text }]}>‹</Text>
+            </Pressable>
 
-              <View style={styles.fechaTextos}>
-                <ThemedText style={styles.fechaTitulo}>{etiquetaDia(dia, hoy)}</ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {fechaCorta(dia)}
-                </ThemedText>
-              </View>
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Día siguiente"
-                disabled={esHoy}
-                hitSlop={12}
-                onPress={() => setDia((d) => sumarDias(d, 1))}>
-                <Text
-                  style={[
-                    styles.flecha,
-                    { color: theme.text, opacity: esHoy ? 0.25 : 1 },
-                  ]}>
-                  ›
-                </Text>
-              </Pressable>
+            <View style={styles.fechaTextos}>
+              <ThemedText style={styles.fechaTitulo}>{etiquetaDia(dia, hoy)}</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {fechaCorta(dia)}
+              </ThemedText>
             </View>
 
-            <View style={styles.espaciador} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Día siguiente"
+              disabled={esHoy}
+              hitSlop={12}
+              onPress={() => setDia((d) => sumarDias(d, 1))}>
+              <Text
+                style={[
+                  styles.flecha,
+                  { color: theme.text, opacity: esHoy ? 0.25 : 1 },
+                ]}>
+                ›
+              </Text>
+            </Pressable>
           </View>
 
           {menu ? (
@@ -207,7 +209,7 @@ export function PantallaDiario({
                 { backgroundColor: theme.backgroundElement, borderColor: theme.danger },
               ]}>
               <Text style={styles.mensajeEmoji}>⚠️</Text>
-              <ThemedText style={styles.mensajeTitulo}>No pudimos cargar tu diario</ThemedText>
+              <ThemedText style={styles.mensajeTitulo}>No pudimos cargar tu historial</ThemedText>
               <ThemedText themeColor="textSecondary" style={styles.textoCentrado}>
                 {error}
               </ThemedText>
@@ -362,10 +364,15 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     gap: 16,
   },
-  topBar: {
+  encabezado: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  titulo: {
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: "800",
   },
   avatar: {
     width: 44,
@@ -378,12 +385,10 @@ const styles = StyleSheet.create({
   avatarEmoji: {
     fontSize: 22,
   },
-  espaciador: {
-    width: 44,
-  },
   fecha: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 16,
   },
   fechaTextos: {

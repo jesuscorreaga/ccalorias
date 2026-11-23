@@ -5,34 +5,41 @@ import { ThemedText } from "@/components/themed-text";
 import { useTheme } from "@/hooks/use-theme";
 import { guardarLocal, leerLocal } from "@/lib/almacen";
 import { claveFecha } from "@/lib/diario";
+import { obtenerUsuarioId } from "@/lib/sesion";
 
 const META_VASOS = 8;
 const ML_POR_VASO = 250;
 
 /**
  * Mini tracker de agua: toca un vaso para llenar hasta ahí; toca el último
- * vaso lleno para quitarlo. Se guarda en el celular, por día.
+ * vaso lleno para quitarlo. Se guarda en el celular, por usuario y por día,
+ * así que otro usuario en el mismo celular no ve el agua del anterior.
  * Usar con key={claveFecha(dia)} para que se reinicie al cambiar de día.
  */
 export function TrackerAgua({ fecha }: { fecha: Date }) {
   const theme = useTheme();
-  const clave = `agua_${claveFecha(fecha)}`;
+  const dia = claveFecha(fecha);
   const [vasos, setVasos] = useState(0);
+  const [usuarioId, setUsuarioId] = useState<string | null>(null);
 
   useEffect(() => {
     let activo = true;
-    leerLocal(clave).then((v) => {
-      if (activo) setVasos(parseInt(v ?? "0", 10) || 0);
-    });
+    (async () => {
+      const id = await obtenerUsuarioId();
+      if (!activo || !id) return;
+      setUsuarioId(id);
+      const guardado = await leerLocal(`agua_${id}_${dia}`);
+      if (activo) setVasos(parseInt(guardado ?? "0", 10) || 0);
+    })();
     return () => {
       activo = false;
     };
-  }, [clave]);
+  }, [dia]);
 
   function tocar(i: number) {
     const nuevo = vasos === i + 1 ? i : i + 1;
     setVasos(nuevo);
-    guardarLocal(clave, String(nuevo));
+    if (usuarioId) guardarLocal(`agua_${usuarioId}_${dia}`, String(nuevo));
   }
 
   const litros = ((vasos * ML_POR_VASO) / 1000).toFixed(2).replace(/\.?0+$/, "").replace(".", ",");
