@@ -78,3 +78,6 @@ class ResumenDiario(BaseModel):
 
 class MetaCaloriasActualizar(BaseModel):
     meta_calorias_diaria: int = Field(ge=800, le=6000)
+
+class GoogleLogin(BaseModel):
+    id_token: str = Field(min_length=1)
