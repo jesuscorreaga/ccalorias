@@ -3,7 +3,6 @@ import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Linking,
   Platform,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AvisoError } from "@/components/aviso-error";
 import { LoginForm } from "@/components/login-form";
 import { PantallaResultado } from "@/components/pantalla-resultado";
 import { ResumenDia } from "@/components/resumen-dia";
@@ -21,11 +21,11 @@ import { useSesionEnFoco } from "@/hooks/use-sesion-en-foco";
 import { useTheme } from "@/hooks/use-theme";
 import {
   type AnalisisFoto,
-  analizarFoto,
   borrarToken,
   obtenerResumenHoy,
   type ResumenDiario,
 } from "@/lib/api";
+import { analizarFoto, MENSAJE_SIN_COMIDA } from "@/lib/analisis";
 
 export default function HomeScreen() {
   const theme = useTheme();
@@ -125,6 +125,13 @@ export default function HomeScreen() {
     setCargando(true);
     try {
       const resultado = await analizarFoto(photo.uri);
+      if (id !== sesion.current) return;
+      if (resultado.contiene_comida === false) {
+        // Foto sin comida: vuelve a la cámara con el mensaje del servidor
+        reiniciar();
+        setError(resultado.mensaje ?? MENSAJE_SIN_COMIDA);
+        return;
+      }
       // Actualiza el resumen antes de mostrar el resultado, así el medidor
       // del día ya incluye esta comida.
       await cargarResumen();
@@ -138,7 +145,6 @@ export default function HomeScreen() {
       } else {
         const mensaje = e instanceof Error ? e.message : "Algo salió mal";
         setError(mensaje);
-        Alert.alert("Error", mensaje);
       }
     } finally {
       setCargando(false);
@@ -212,9 +218,7 @@ export default function HomeScreen() {
         <TituloPantalla texto="Inicio" />
         <ResumenDia resumen={resumen} />
         {error ? (
-          <ThemedText themeColor="danger" style={styles.error}>
-            {error}
-          </ThemedText>
+          <AvisoError mensaje={error} onCerrar={() => setError(null)} />
         ) : null}
         <CameraView ref={cameraRef} style={styles.camera} facing="back" />
         <SafeAreaView
