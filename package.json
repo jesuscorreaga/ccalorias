@@ -6,8 +6,10 @@
     "@expo/ui": "~58.0.25",
     "@types/react": "~19.3.0",
     "expo": "^58.0.21",
+    "expo-auth-session": "~58.0.19",
     "expo-camera": "~58.0.14",
     "expo-constants": "~58.0.14",
+    "expo-crypto": "~58.0.8",
     "expo-device": "~58.0.5",
     "expo-font": "~58.0.11",
     "expo-glass-effect": "~58.0.5",
@@ -27,6 +29,7 @@
     "react-native-reanimated": "4.7.1",
     "react-native-safe-area-context": "~5.10.1",
     "react-native-screens": "~4.30.0",
+    "react-native-svg": "15.16.0",
     "react-native-web": "^0.21.4",
     "react-native-worklets": "0.13.0"
   },

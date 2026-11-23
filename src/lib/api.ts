@@ -60,6 +60,24 @@ export async function login(email: string, password: string) {
   await guardarToken(data.access_token);
 }
 
+export async function loginConGoogle(idToken: string) {
+  const res = await fetchConTimeout(`${API_URL}/auth/google`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id_token: idToken }),
+  });
+
+  const data = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    throw new Error(
+      mensajeDeError(data?.detail, "No se pudo iniciar sesión con Google"),
+    );
+  }
+
+  await guardarToken(data.access_token);
+}
+
 export async function registrar(email: string, password: string) {
   const res = await fetchConTimeout(`${API_URL}/auth/register`, {
     method: "POST",
