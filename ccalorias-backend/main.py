@@ -135,11 +135,14 @@ async def generar_con_reintentos(contents, config, intentos=3):
 
 def verificar_token_google(token: str) -> dict:
     """Verifica firma, emisor, expiración y audiencia del ID token de Google."""
-    return google_id_token.verify_oauth2_token(
+    info = google_id_token.verify_oauth2_token(
         token,
         google_requests.Request(),
-        audience=GOOGLE_CLIENT_IDS,
     )
+    # Google recomienda validar manualmente aud cuando hay varios clientes OAuth.
+    if info.get("aud") not in GOOGLE_CLIENT_IDS:
+        raise ValueError("El token fue emitido para otro cliente OAuth")
+    return info
 
 
 def crear_token(usuario_id: str) -> str:
@@ -212,7 +215,11 @@ async def login_usuario(datos: UsuarioLogin):
         collation=COLLATION_EMAIL,
     )
     password_hash = usuario.get("password_hash") if usuario else None
-    if not usuario or not password_hash or not pwd_context.verify(datos.password, password_hash):
+    if (
+        not usuario
+        or not password_hash
+        or not pwd_context.verify(datos.password, password_hash)
+    ):
         raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
 
     token = crear_token(str(usuario["_id"]))
@@ -238,7 +245,7 @@ async def login_google(datos: GoogleLogin):
         raise HTTPException(status_code=401, detail="Token de Google inválido") from None
 
     email = info.get("email")
-    if not email or not info.get("email_verified"):
+    if not isinstance(email, str) or not email.strip() or not info.get("email_verified"):
         raise HTTPException(
             status_code=401,
             detail="Google no ha verificado el correo de esta cuenta",
