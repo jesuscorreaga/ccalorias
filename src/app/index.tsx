@@ -1,29 +1,31 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Linking,
   Platform,
   StyleSheet,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AvisoError } from "@/components/aviso-error";
 import { LoginForm } from "@/components/login-form";
 import { PantallaResultado } from "@/components/pantalla-resultado";
 import { ResumenDia } from "@/components/resumen-dia";
 import { ThemedText } from "@/components/themed-text";
+import { TituloPantalla } from "@/components/titulo-pantalla";
 import { BotonGrande } from "@/components/ui/boton-grande";
+import { useSesionEnFoco } from "@/hooks/use-sesion-en-foco";
 import { useTheme } from "@/hooks/use-theme";
 import {
   type AnalisisFoto,
-  analizarFoto,
   borrarToken,
   obtenerResumenHoy,
-  obtenerToken,
   type ResumenDiario,
 } from "@/lib/api";
+import { analizarFoto, MENSAJE_SIN_COMIDA } from "@/lib/analisis";
 
 export default function HomeScreen() {
   const theme = useTheme();
@@ -38,30 +40,29 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const primerFoco = useRef(true);
   const yaPidioPermiso = useRef(false);
+  // Número de sesión: sube cada vez que se cierra. Sirve para ignorar
+  // respuestas tardías que le pertenecen al usuario anterior.
+  const sesion = useRef(0);
 
   // Cada vez que se abre esta pestaña revisa si hay sesión (por si se cerró o
-  // venció desde el diario) y actualiza el resumen del día.
-  useFocusEffect(
-    useCallback(() => {
-      let activo = true;
-      const esPrimero = primerFoco.current;
-      primerFoco.current = false;
-      obtenerToken().then((token) => {
-        if (!activo) return;
-        setAutenticado(!!token);
-        if (token && !esPrimero) cargarResumen();
-      });
-      return () => {
-        activo = false;
-      };
-    }, []),
-  );
+  // venció desde el historial) y actualiza el resumen del día.
+  const { listo } = useSesionEnFoco((token) => {
+    setAutenticado(!!token);
+    if (token && !primerFoco.current) cargarResumen();
+    primerFoco.current = false;
+  });
 
   async function cargarResumen() {
+    const id = sesion.current;
     try {
-      setResumen(await obtenerResumenHoy());
+      const datos = await obtenerResumenHoy();
+      if (id === sesion.current) setResumen(datos);
     } catch (e) {
-      if (e instanceof Error && e.message === "SESION_EXPIRADA") {
+      if (
+        id === sesion.current &&
+        e instanceof Error &&
+        e.message === "SESION_EXPIRADA"
+      ) {
         setAutenticado(false);
       }
     }
@@ -69,6 +70,19 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (autenticado) cargarResumen();
+  }, [autenticado]);
+
+  // Cuando la sesión termina (por el botón, por vencimiento o desde el historial)
+  // se borra TODO lo del usuario anterior.
+  useEffect(() => {
+    if (autenticado === false) {
+      sesion.current += 1;
+      setResumen(null);
+      setPhotoUri(null);
+      setAnalisis(null);
+      setError(null);
+      setCargando(false);
+    }
   }, [autenticado]);
 
   // Si falta el permiso de cámara, la app lo pide automáticamente (una vez).
@@ -90,21 +104,19 @@ export default function HomeScreen() {
     setAnalisis(null);
   }
 
-  function verDiario() {
+  function verHistorial() {
     reiniciar();
-    router.navigate("/explore");
+    router.navigate("/historial");
   }
 
   async function cerrarSesion() {
     await borrarToken();
-    reiniciar();
-    setError(null);
-    setResumen(null);
     setAutenticado(false);
   }
 
   async function takePicture() {
     if (!cameraRef.current || cargando) return;
+    const id = sesion.current;
     const photo = await cameraRef.current.takePictureAsync({ quality: 0.6 });
     if (!photo) return;
 
@@ -113,18 +125,26 @@ export default function HomeScreen() {
     setCargando(true);
     try {
       const resultado = await analizarFoto(photo.uri);
+      if (id !== sesion.current) return;
+      if (resultado.contiene_comida === false) {
+        // Foto sin comida: vuelve a la cámara con el mensaje del servidor
+        reiniciar();
+        setError(resultado.mensaje ?? MENSAJE_SIN_COMIDA);
+        return;
+      }
       // Actualiza el resumen antes de mostrar el resultado, así el medidor
       // del día ya incluye esta comida.
       await cargarResumen();
+      if (id !== sesion.current) return;
       setAnalisis(resultado);
     } catch (e) {
+      if (id !== sesion.current) return;
       reiniciar();
       if (e instanceof Error && e.message === "SESION_EXPIRADA") {
         setAutenticado(false);
       } else {
         const mensaje = e instanceof Error ? e.message : "Algo salió mal";
         setError(mensaje);
-        Alert.alert("Error", mensaje);
       }
     } finally {
       setCargando(false);
@@ -133,88 +153,106 @@ export default function HomeScreen() {
 
   const fondo = { backgroundColor: theme.background };
 
-  if (autenticado === null) {
-    return (
-      <SafeAreaView style={[styles.centrado, fondo]}>
-        <ActivityIndicator size="large" color={theme.primary} />
-      </SafeAreaView>
-    );
-  }
+  function contenido() {
+    if (autenticado === null) {
+      return (
+        <SafeAreaView style={[styles.centrado, fondo]}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </SafeAreaView>
+      );
+    }
 
-  if (!autenticado) {
-    return <LoginForm onSuccess={() => setAutenticado(true)} />;
-  }
+    if (!autenticado) {
+      return <LoginForm onSuccess={() => setAutenticado(true)} />;
+    }
 
-  if (!permission) {
-    return <SafeAreaView style={[styles.container, fondo]} />;
-  }
+    if (!permission) {
+      return <SafeAreaView style={[styles.container, fondo]} />;
+    }
 
-  if (!permission.granted) {
-    return (
-      <SafeAreaView style={[styles.centrado, styles.padding, fondo]}>
-        <ThemedText style={styles.centrarTexto}>
-          {permission.canAskAgain
-            ? "Necesitamos tu cámara para analizar tus platos."
-            : "El permiso de cámara está desactivado. Actívalo en los ajustes para poder analizar tus platos."}
-        </ThemedText>
-        {permission.canAskAgain ? (
+    if (!permission.granted) {
+      return (
+        <SafeAreaView style={[styles.centrado, styles.padding, fondo]}>
+          <ThemedText style={styles.centrarTexto}>
+            {permission.canAskAgain
+              ? "Necesitamos tu cámara para analizar tus platos."
+              : "El permiso de cámara está desactivado. Actívalo en los ajustes para poder analizar tus platos."}
+          </ThemedText>
+          {permission.canAskAgain ? (
+            <BotonGrande
+              titulo="Dar permiso de cámara"
+              onPress={requestPermission}
+            />
+          ) : Platform.OS !== "web" ? (
+            <BotonGrande
+              titulo="Abrir ajustes"
+              onPress={() => Linking.openSettings()}
+            />
+          ) : null}
           <BotonGrande
-            titulo="Dar permiso de cámara"
-            onPress={requestPermission}
+            titulo="Cerrar sesión"
+            variante="secundario"
+            onPress={cerrarSesion}
           />
-        ) : Platform.OS !== "web" ? (
-          <BotonGrande
-            titulo="Abrir ajustes"
-            onPress={() => Linking.openSettings()}
-          />
+        </SafeAreaView>
+      );
+    }
+
+    // Resultados (después de tomar la foto)
+    if (photoUri) {
+      return (
+        <PantallaResultado
+          fotoUri={photoUri}
+          analisis={analisis}
+          cargando={cargando}
+          resumen={resumen}
+          onNuevaFoto={reiniciar}
+          onVerHistorial={verHistorial}
+        />
+      );
+    }
+
+    // Cámara
+    return (
+      <SafeAreaView style={[styles.container, fondo]}>
+        <TituloPantalla texto="Inicio" />
+        <ResumenDia resumen={resumen} />
+        {error ? (
+          <AvisoError mensaje={error} onCerrar={() => setError(null)} />
         ) : null}
+        <CameraView ref={cameraRef} style={styles.camera} facing="back" />
+        <SafeAreaView
+          style={[
+            styles.buttonRow,
+            { backgroundColor: theme.background, borderTopColor: theme.border },
+          ]}
+        >
+          <BotonGrande
+            titulo="Tomar foto"
+            onPress={takePicture}
+            style={styles.boton}
+          />
+          <BotonGrande
+            titulo="Cerrar sesión"
+            variante="secundario"
+            compacto
+            onPress={cerrarSesion}
+            style={styles.boton}
+          />
+        </SafeAreaView>
       </SafeAreaView>
     );
   }
 
-  // Resultados (después de tomar la foto)
-  if (photoUri) {
-    return (
-      <PantallaResultado
-        fotoUri={photoUri}
-        analisis={analisis}
-        cargando={cargando}
-        resumen={resumen}
-        onNuevaFoto={reiniciar}
-        onVerDiario={verDiario}
-      />
-    );
-  }
-
-  // Cámara
+  // Mientras se comprueba la sesión no se muestra nada, para que no se vea ni
+  // un instante información del usuario anterior.
   return (
-    <SafeAreaView style={[styles.container, fondo]}>
-      <ResumenDia resumen={resumen} />
-      {error ? (
-        <ThemedText themeColor="danger" style={styles.error}>
-          {error}
-        </ThemedText>
-      ) : null}
-      <CameraView ref={cameraRef} style={styles.camera} facing="back" />
-      <SafeAreaView
-        style={[
-          styles.buttonRow,
-          { backgroundColor: theme.background, borderTopColor: theme.border },
-        ]}
-      >
-        <BotonGrande
-          titulo="Tomar foto"
-          onPress={takePicture}
-          style={styles.botonFoto}
-        />
-        <BotonGrande
-          titulo="Salir"
-          variante="secundario"
-          onPress={cerrarSesion}
-          style={styles.botonSalir}
-        />
-      </SafeAreaView>
-    </SafeAreaView>
+    <View
+      style={[styles.container, fondo, { opacity: listo ? 1 : 0 }]}
+      pointerEvents={listo ? "auto" : "none"}
+    >
+      {contenido()}
+    </View>
   );
 }
 
@@ -247,10 +285,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
   },
-  botonFoto: {
-    flex: 2,
-  },
-  botonSalir: {
+  boton: {
     flex: 1,
   },
 });

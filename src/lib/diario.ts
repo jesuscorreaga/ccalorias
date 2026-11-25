@@ -84,7 +84,7 @@ export function mismoDia(a: Date, b: Date) {
 export function claveFecha(d: Date) {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mm}-${dd}`;
+  return `${String(d.getFullYear()).padStart(4, "0")}-${mm}-${dd}`;
 }
 
 export function etiquetaDia(d: Date, hoy: Date = new Date()) {
